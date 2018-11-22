@@ -11,6 +11,7 @@ RM := rm -rf
 -include utilities/subdir.mk
 -include startup/subdir.mk
 -include source/subdir.mk
+-include paho/MQTTSNPacket/src/subdir.mk
 -include openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/subdir.mk
 -include openthread/third_party/nxp/MKW41Z4/XCVR/XCVR_Test/subdir.mk
 -include openthread/third_party/nxp/MKW41Z4/XCVR/subdir.mk
@@ -28,7 +29,6 @@ RM := rm -rf
 -include openthread/examples/platforms/kw41z/subdir.mk
 -include drivers/subdir.mk
 -include board/subdir.mk
--include MQTTSNPacket/src/subdir.mk
 -include CMSIS/subdir.mk
 -include subdir.mk
 -include objects.mk

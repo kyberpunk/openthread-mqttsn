@@ -25,7 +25,6 @@ C_DEPS :=
 # Every subdirectory with source files must be described here
 SUBDIRS := \
 CMSIS \
-MQTTSNPacket/src \
 board \
 drivers \
 openthread/examples/platforms/kw41z \
@@ -43,6 +42,7 @@ openthread/third_party/mbedtls/repo/library \
 openthread/third_party/nxp/MKW41Z4/XCVR/XCVR_Test \
 openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x \
 openthread/third_party/nxp/MKW41Z4/XCVR \
+paho/MQTTSNPacket/src \
 source \
 startup \
 utilities \

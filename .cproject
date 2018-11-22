@@ -306,7 +306,7 @@
 						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="drivers"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="openthread/examples/platforms/kw41z"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="openthread/examples/platforms/utils"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="openthread/src/core"/>
+						<entry excluding="common/extension_example.cpp" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="openthread/src/core"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="openthread/third_party/mbedtls/repo/library"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="openthread/third_party/nxp/MKW41Z4/XCVR"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="paho/MQTTSNPacket/src"/>
@@ -618,7 +618,7 @@
 						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="drivers"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="openthread/examples/platforms/kw41z"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="openthread/examples/platforms/utils"/>
-						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="openthread/src/core"/>
+						<entry excluding="common/extension_example.cpp" flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="openthread/src/core"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="openthread/third_party/mbedtls/repo/library"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="openthread/third_party/nxp/MKW41Z4/XCVR"/>
 						<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="paho/MQTTSNPacket/src"/>
