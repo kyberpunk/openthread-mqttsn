@@ -6,12 +6,14 @@
 #include "openthread/instance.h"
 #include "openthread-system.h"
 #include "board.h"
+#include "smart_socket_platform.h"
 
 #include "mqttsn_client.hpp"
 
 int main(int argc, char *argv[])
 {
 	otSysInit(argc, argv);
+	socket_platform_init();
 	BOARD_InitDebugConsole();
 
     ot::Instance instance = ot::Instance::InitSingle();
