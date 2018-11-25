@@ -68,26 +68,6 @@
 #define LONG_PRESS 3000
 #endif
 
-#ifndef MEASURE_PERIOD
-/**
- * @def MEASURE_PERIOD
- *
- * Measurement data period in seconds.
- *
- */
-#define MEASURE_PERIOD 3
-#endif
-
-#ifndef COAP_ATTEMPTS
-/**
- * @def COAP_ATTEMPTS
- *
- * CoAP request attempts before failure.
- *
- */
-#define COAP_ATTEMPTS 3
-#endif
-
 #ifndef SMART_SOCKET_LOG_LEVEL
 /**
  * @def COAP_ATTEMPTS

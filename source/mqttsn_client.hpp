@@ -58,7 +58,7 @@ public:
 		return mClientId;
 	}
 
-	void SetClientId(std::string &clientId) {
+	void SetClientId(const std::string &clientId) {
 		mClientId = clientId;
 	}
 

@@ -38,7 +38,6 @@
 									<listOptionValue builtIn="false" value="DEBUG"/>
 									<listOptionValue builtIn="false" value="MBEDTLS_CONFIG_FILE='&quot;mbedtls-config.h&quot;'"/>
 									<listOptionValue builtIn="false" value="OPENTHREAD_PROJECT_CORE_CONFIG_FILE='&quot;openthread-core-kw41z-config.h&quot;'"/>
-									<listOptionValue builtIn="false" value="OPENTHREAD_CONFIG_FILE='&quot;openthread-config-generic.h&quot;'"/>
 									<listOptionValue builtIn="false" value="OPENTHREAD_FTD=1"/>
 									<listOptionValue builtIn="false" value="CPU_MKW41Z512VHT4"/>
 									<listOptionValue builtIn="false" value="CPU_MKW41Z512VHT4_cm0plus"/>
@@ -111,7 +110,6 @@
 									<listOptionValue builtIn="false" value="DEBUG"/>
 									<listOptionValue builtIn="false" value="MBEDTLS_CONFIG_FILE='&quot;mbedtls-config.h&quot;'"/>
 									<listOptionValue builtIn="false" value="OPENTHREAD_PROJECT_CORE_CONFIG_FILE='&quot;openthread-core-kw41z-config.h&quot;'"/>
-									<listOptionValue builtIn="false" value="OPENTHREAD_CONFIG_FILE='&quot;openthread-config-generic.h&quot;'"/>
 									<listOptionValue builtIn="false" value="OPENTHREAD_FTD=1"/>
 									<listOptionValue builtIn="false" value="CPU_MKW41Z512VHT4"/>
 									<listOptionValue builtIn="false" value="CPU_MKW41Z512VHT4_cm0plus"/>
@@ -355,7 +353,6 @@
 									<listOptionValue builtIn="false" value="NDEBUG"/>
 									<listOptionValue builtIn="false" value="MBEDTLS_CONFIG_FILE='&quot;mbedtls-config.h&quot;'"/>
 									<listOptionValue builtIn="false" value="OPENTHREAD_PROJECT_CORE_CONFIG_FILE='&quot;openthread-core-kw41z-config.h&quot;'"/>
-									<listOptionValue builtIn="false" value="OPENTHREAD_CONFIG_FILE=openthread-config-generic.h"/>
 									<listOptionValue builtIn="false" value="OPENTHREAD_FTD=1"/>
 									<listOptionValue builtIn="false" value="CPU_MKW41Z512VHT4"/>
 									<listOptionValue builtIn="false" value="CPU_MKW41Z512VHT4_cm0plus"/>
@@ -426,7 +423,6 @@
 									<listOptionValue builtIn="false" value="NDEBUG"/>
 									<listOptionValue builtIn="false" value="MBEDTLS_CONFIG_FILE='&quot;mbedtls-config.h&quot;'"/>
 									<listOptionValue builtIn="false" value="OPENTHREAD_PROJECT_CORE_CONFIG_FILE='&quot;openthread-core-kw41z-config.h&quot;'"/>
-									<listOptionValue builtIn="false" value="OPENTHREAD_CONFIG_FILE=openthread-config-generic.h"/>
 									<listOptionValue builtIn="false" value="OPENTHREAD_FTD=1"/>
 									<listOptionValue builtIn="false" value="CPU_MKW41Z512VHT4"/>
 									<listOptionValue builtIn="false" value="CPU_MKW41Z512VHT4_cm0plus"/>

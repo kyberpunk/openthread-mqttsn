@@ -45,7 +45,6 @@
 #include "smart_socket_platform.h"
 #include "smart_socket_config.h"
 #include "board.h"
-#include "platform.h"
 #include "fsl_debug_console.h"
 
 #define PIN6_IDX                         6u
@@ -68,24 +67,6 @@
 #define PIN17_IDX                       17U
 #define PIN18_IDX                       18U
 #define PIN19_IDX                       19U
-
-SPI_Instance_t spi1 = {
-		.clock = DSPI1_CLK_SRC,
-		.spi_type = DSPI1
-};
-
-spi_handle_data spi_config_default = {
-		.spi = &spi1
-};
-
-pin_handle_data pin_config_default = {
-		.cs_pin = CS_PIN,
-		.cs_pin_type = CS_GPIO_PORT,
-		.en_pin = EN_PIN,
-		.en_pin_type = EN_GPIO_PORT,
-		.syn_pin = SYN_PIN,
-		.syn_pin_type = SYN_GPIO_PORT
-};
 
 void socket_platform_init() {
 	CLOCK_EnableClock(kCLOCK_PortC);
