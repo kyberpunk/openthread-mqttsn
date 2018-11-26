@@ -25,8 +25,6 @@ enum EventType {
 	MQTTSN_CONNECTED = 1
 };
 
-typedef void (*ConnectCallbackFunc)(ReturnCode code);
-
 class MqttsnConfig {
 public:
 	MqttsnConfig(void)
@@ -89,6 +87,10 @@ private:
 class MqttsnClient : public InstanceLocator
 {
 public:
+	typedef void (*ConnectCallbackFunc)(ReturnCode code, void* context);
+
+	typedef void (*SubscribeCallbackFunc)(ReturnCode code, const std::string &topic, void* context);
+
 	MqttsnClient(Instance &aInstance);
 
 	otError Start(uint16_t port);
@@ -97,15 +99,27 @@ public:
 
 	otError Connect(MqttsnConfig &config);
 
-	otError SetConnectCallback(ConnectCallbackFunc callback);
+	otError SetConnectCallback(ConnectCallbackFunc callback, void* context);
+
+	otError Subscribe(const std::string &topic);
+
+	otError SetSubscribeCallback(SubscribeCallbackFunc callback, void* context);
 
 private:
 	static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
+
+	otError SendMessage(unsigned char* buffer, int32_t length);
+
+	otError SendMessage(unsigned char* buffer, int32_t length, const Ip6::Address &address, uint16_t port);
 
 	Ip6::UdpSocket mSocket;
 	bool mIsConnected;
 	MqttsnConfig mConfig;
 	ConnectCallbackFunc mConnectCallback;
+	void* mConnectContext;
+	SubscribeCallbackFunc mSubscribeCallback;
+	void* mSubscribeContext;
+	int32_t mPacketId;
 };
 
 }

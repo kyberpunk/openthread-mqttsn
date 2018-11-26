@@ -62,7 +62,7 @@ static void ShortPressCallback() {
 			JoinerCallback, nullptr);
 }
 
-static void MqttsnConnectCallback(ot::Mqttsn::ReturnCode code) {
+static void MqttsnConnectCallback(ot::Mqttsn::ReturnCode code, void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
 		socket_platform_log(SOCKET_LOG_INFO, "Successfully connected.");
 		state = STATE_MQTT_CONNECTED;
@@ -84,7 +84,7 @@ static void MqttsnConnect() {
 	address.FromString(GATEWAY_ADDRESS);
 	config.SetAddress(address);
 
-	client->SetConnectCallback(MqttsnConnectCallback);
+	client->SetConnectCallback(MqttsnConnectCallback, nullptr);
 	client->Connect(config);
 	socket_platform_log(SOCKET_LOG_INFO, "Connecting to MQTTSN broker.");
 }
