@@ -89,7 +89,7 @@ class MqttsnClient : public InstanceLocator
 public:
 	typedef void (*ConnectCallbackFunc)(ReturnCode code, void* context);
 
-	typedef void (*SubscribeCallbackFunc)(ReturnCode code, const std::string &topic, void* context);
+	typedef void (*SubscribeCallbackFunc)(ReturnCode code, void* context);
 
 	MqttsnClient(Instance &aInstance);
 

@@ -14,6 +14,7 @@
 
 #define GATEWAY_PORT 10000
 #define GATEWAY_ADDRESS ""
+#define DEFAULT_TOPIC "test"
 
 enum ApplicationState {
 	STATE_STARTED,
@@ -22,7 +23,8 @@ enum ApplicationState {
 	STATE_THREAD_STARTING,
 	STATE_THREAD_STARTED,
 	STATE_MQTT_CONNECTING,
-	STATE_MQTT_CONNECTED
+	STATE_MQTT_CONNECTED,
+	STATE_MQTT_RUNNING
 };
 
 static ot::Instance* instance = nullptr;
@@ -89,6 +91,22 @@ static void MqttsnConnect() {
 	socket_platform_log(SOCKET_LOG_INFO, "Connecting to MQTTSN broker.");
 }
 
+static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode code, void* context) {
+	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
+		socket_platform_log(SOCKET_LOG_INFO, "Successfully subscribed.");
+		state = STATE_MQTT_CONNECTED;
+	} else {
+		socket_platform_log(SOCKET_LOG_WARN, "Subscription failed with code: %d.", code);
+		state = STATE_THREAD_STARTED;
+	}
+}
+
+static void MqttsnSubscribe() {
+	client->SetSubscribeCallback(MqttsnSubscribeCallback, nullptr);
+	client->Subscribe(DEFAULT_TOPIC);
+	socket_platform_log(SOCKET_LOG_INFO, "Subscribing to topic: %s", SOCKET_LOG_INFO);
+}
+
 static void ProcessWorker() {
 	otDeviceRole role;
 	switch (state) {
@@ -101,6 +119,10 @@ static void ProcessWorker() {
 	case STATE_THREAD_STARTED:
 		MqttsnConnect();
 		state = STATE_MQTT_CONNECTING;
+		break;
+	case STATE_MQTT_CONNECTED:
+		MqttsnSubscribe();
+		state = STATE_MQTT_RUNNING;
 		break;
 	default:
 		break;

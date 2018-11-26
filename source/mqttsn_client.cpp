@@ -80,7 +80,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 			break;
 		}
 		if (client->mSubscribeCallback != nullptr) {
-			client->mSubscribeCallback(static_cast<ReturnCode>(subscribeReturnCode), "", client->mSubscribeContext);
+			client->mSubscribeCallback(static_cast<ReturnCode>(subscribeReturnCode), client->mSubscribeContext);
 		}
 		break;
 	default:
@@ -154,7 +154,7 @@ otError MqttsnClient::Subscribe(const std::string &topic) {
 	otError error = OT_ERROR_NONE;
 	Ip6::MessageInfo messageInfo;
 	int32_t length = 0;
-	MQTTSN_topicid topicId;
+	MQTTSN_topicid topicIdConfig;
 
 	char* topicString = new char[topic.length() + 1];
 	if (topicString == nullptr) {
@@ -162,12 +162,12 @@ otError MqttsnClient::Subscribe(const std::string &topic) {
 		goto exit;
 	}
 	strcpy(topicString, topic.c_str());
-	topicId.type = MQTTSN_TOPIC_TYPE_NORMAL;
-	topicId.data.long_.name = topicString;
-	topicId.data.long_.len = topic.length();
+	topicIdConfig.type = MQTTSN_TOPIC_TYPE_NORMAL;
+	topicIdConfig.data.long_.name = topicString;
+	topicIdConfig.data.long_.len = topic.length();
 
 	unsigned char buffer[MAX_PACKET_SIZE];
-	length = MQTTSNSerialize_subscribe(buffer, MAX_PACKET_SIZE, 0, 2, mPacketId++, &topicId);
+	length = MQTTSNSerialize_subscribe(buffer, MAX_PACKET_SIZE, 0, 2, mPacketId++, &topicIdConfig);
 	delete[] topicString;
 	if (length <= 0) {
 		error = OT_ERROR_FAILED;
