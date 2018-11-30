@@ -35,12 +35,20 @@ static ot::Mqttsn::MqttsnClient* client = nullptr;
 
 static void MqttsnConnectCallback(ot::Mqttsn::ReturnCode code, void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
-		printf("Successfully connected.");
+		printf("Successfully connected.\r\n");
 		state = STATE_MQTT_CONNECTED;
 	} else {
-		printf("Connection failed with code: %d.", code);
+		printf("Connection failed with code: %d.\r\n", code);
 		state = STATE_THREAD_STARTED;
 	}
+}
+
+static void MqttsnReceived(const uint8_t* payload, int32_t payloadLength, void* context) {
+	printf("Message received:\r\n");
+	for (int i = 0; i < payloadLength; i++) {
+		printf("%c", static_cast<int8_t>(payload[i]));
+	}
+	printf("\r\n");
 }
 
 static void MqttsnConnect() {
@@ -56,24 +64,25 @@ static void MqttsnConnect() {
 	config.SetAddress(address);
 
 	client->SetConnectCallback(MqttsnConnectCallback, nullptr);
+	client->SetDataReceivedCallback(MqttsnReceived, nullptr);
 	client->Connect(config);
-	printf("Connecting to MQTTSN broker.");
+	printf("Connecting to MQTTSN broker.\r\n");
 }
 
 static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode code, void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
-		printf("Successfully subscribed.");
-		state = STATE_MQTT_CONNECTED;
+		printf("Successfully subscribed.\r\n");
+		state = STATE_MQTT_RUNNING;
 	} else {
-		printf("Subscription failed with code: %d.", code);
-		state = STATE_THREAD_STARTED;
+		printf("Subscription failed with code: %d.\r\n", code);
+		state = STATE_MQTT_CONNECTED;
 	}
 }
 
 static void MqttsnSubscribe() {
 	client->SetSubscribeCallback(MqttsnSubscribeCallback, nullptr);
 	client->Subscribe(DEFAULT_TOPIC);
-	printf("Subscribing to topic: %s", DEFAULT_TOPIC);
+	printf("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
 }
 
 static void ProcessWorker() {
@@ -130,7 +139,7 @@ int main(int argc, char *argv[]) {
     return 0;
 
 exit:
-	printf("Initialization failed with error: %d", error);
+	printf("Initialization failed with error: %d\r\n", error);
 	return 1;
 }
 

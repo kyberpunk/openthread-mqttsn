@@ -5,7 +5,7 @@
  * Generated linker script file for MKW41Z512xxx4
  * Created from memory.ldt by FMCreateLinkMemory
  * Using Freemarker v2.3.23
- * MCUXpresso IDE v10.2.1 [Build 795] [2018-07-25]  on Nov 30, 2018 10:41:34 AM
+ * MCUXpresso IDE v10.2.1 [Build 795] [2018-07-25]  on Nov 30, 2018 12:23:25 PM
  */
 
 MEMORY

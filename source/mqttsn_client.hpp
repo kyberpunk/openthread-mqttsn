@@ -91,6 +91,8 @@ public:
 
 	typedef void (*SubscribeCallbackFunc)(ReturnCode code, void* context);
 
+	typedef void (*DataReceivedCallbackFunc)(const uint8_t* payload, int32_t payloadLength, void* context);
+
 	MqttsnClient(Instance &aInstance);
 
 	otError Start(uint16_t port);
@@ -104,6 +106,8 @@ public:
 	otError Subscribe(const std::string &topic);
 
 	otError SetSubscribeCallback(SubscribeCallbackFunc callback, void* context);
+
+	otError SetDataReceivedCallback(DataReceivedCallbackFunc callback, void* context);
 
 private:
 	static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
@@ -120,6 +124,8 @@ private:
 	SubscribeCallbackFunc mSubscribeCallback;
 	void* mSubscribeContext;
 	int32_t mPacketId;
+	DataReceivedCallbackFunc mDataReceivedCallback;
+	void* mDataReceivedContext;
 };
 
 }

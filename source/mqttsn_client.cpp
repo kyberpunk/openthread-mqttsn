@@ -21,7 +21,9 @@ MqttsnClient::MqttsnClient(Instance& aInstance)
 	, mConnectContext(nullptr)
 	, mSubscribeCallback(nullptr)
 	, mSubscribeContext(nullptr)
-	, mPacketId(0) {
+	, mPacketId(0)
+	, mDataReceivedCallback(nullptr)
+	, mDataReceivedContext(nullptr) {
 	;
 }
 
@@ -67,22 +69,46 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 			break;
 		}
 		if (client->mConnectCallback != nullptr) {
-			client->mConnectCallback(static_cast<ReturnCode>(connectReturnCode), client->mConnectContext);
+			client->mConnectCallback(static_cast<ReturnCode>(connectReturnCode),
+					client->mConnectContext);
 		}
 		break;
-	case MQTTSN_SUBACK:
+	case MQTTSN_SUBACK: {
 		int qos;
 		unsigned short topicId;
 		unsigned short packetId;
 		unsigned char subscribeReturnCode;
-		if (MQTTSNDeserialize_suback(&qos, &topicId, &packetId, &subscribeReturnCode, data, length) != 1) {
+		if (MQTTSNDeserialize_suback(&qos, &topicId, &packetId,
+				&subscribeReturnCode, data, length) != 1) {
 			// TODO: Log error
 			break;
 		}
 		if (client->mSubscribeCallback != nullptr) {
-			client->mSubscribeCallback(static_cast<ReturnCode>(subscribeReturnCode), client->mSubscribeContext);
+			client->mSubscribeCallback(
+					static_cast<ReturnCode>(subscribeReturnCode),
+					client->mSubscribeContext);
 		}
 		break;
+	}
+	case MQTTSN_PUBLISH: {
+		int qos;
+		unsigned short packetId;
+		int payloadLength;
+		unsigned char* payload;
+		unsigned char dup;
+		unsigned char retained;
+		MQTTSN_topicid topicId;
+		if (MQTTSNDeserialize_publish(&dup, &qos, &retained, &packetId,
+				&topicId, &payload, &payloadLength, data, length) != 1) {
+			// TODO: Log error
+			break;
+		}
+		if (client->mDataReceivedCallback != nullptr) {
+			client->mDataReceivedCallback(payload, payloadLength,
+					client->mDataReceivedContext);
+		}
+		break;
+	}
 	default:
 		break;
 	}
@@ -182,6 +208,12 @@ exit:
 otError MqttsnClient::SetSubscribeCallback(SubscribeCallbackFunc callback, void* context) {
 	mSubscribeCallback = callback;
 	mSubscribeContext = context;
+	return OT_ERROR_NONE;
+}
+
+otError MqttsnClient::SetDataReceivedCallback(DataReceivedCallbackFunc callback, void* context) {
+	mDataReceivedCallback = callback;
+	mDataReceivedContext = context;
 	return OT_ERROR_NONE;
 }
 
