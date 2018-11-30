@@ -6,11 +6,14 @@
 #include "openthread/instance.h"
 #include "openthread-system.h"
 #include "board.h"
-#include "smart_socket_platform.h"
-#include "smart_socket_config.h"
-#include "button_abstraction.h"
 
 #include "mqttsn_client.hpp"
+
+#define NETWORK_NAME "OpenThreadDemo"
+#define PANID 0x1234
+#define EXTPANID {0x11, 0x11, 0x11, 0x11, 0x22, 0x22, 0x22, 0x22}
+#define DEFAULT_CHANNEL 15
+#define MASTER_KEY {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
 
 #define GATEWAY_PORT 10000
 #define GATEWAY_ADDRESS ""
@@ -19,7 +22,6 @@
 enum ApplicationState {
 	STATE_STARTED,
 	STATE_INITIALIZED,
-	STATE_JOINER,
 	STATE_THREAD_STARTING,
 	STATE_THREAD_STARTED,
 	STATE_MQTT_CONNECTING,
@@ -31,45 +33,12 @@ static ot::Instance* instance = nullptr;
 static ApplicationState state = STATE_STARTED;
 static ot::Mqttsn::MqttsnClient* client = nullptr;
 
-static void JoinerCallback(otError aError, void *aContext) {
-	switch (aError) {
-	case OT_ERROR_NONE:
-		socket_platform_log(SOCKET_LOG_INFO, "Joiner success.");
-		instance->GetThreadNetif().GetMle().Start(true, false);
-		instance->GetSettings().SaveThreadAutoStart(true);
-		state = STATE_THREAD_STARTED;
-		break;
-	case OT_ERROR_SECURITY:
-		socket_platform_log(SOCKET_LOG_WARN, "Joiner failed: SECURITY.");
-		state = STATE_INITIALIZED;
-		break;
-	case OT_ERROR_NOT_FOUND:
-		socket_platform_log(SOCKET_LOG_WARN, "Joiner failed: NOT FOUND.");
-		state = STATE_INITIALIZED;
-		break;
-	default:
-		socket_platform_log(SOCKET_LOG_WARN, "Joiner failed: OTHER - %d.", aError);
-		state = STATE_INITIALIZED;
-		break;
-	}
-}
-
-static void ShortPressCallback() {
-	if (state == STATE_THREAD_STARTED) {
-		instance->GetThreadNetif().GetMle().Stop(false);
-	}
-	state = STATE_JOINER;
-	instance->GetThreadNetif().GetJoiner().Start(PSKD, nullptr, PACKAGE_NAME,
-			OPENTHREAD_CONFIG_PLATFORM_INFO, PACKAGE_VERSION, nullptr,
-			JoinerCallback, nullptr);
-}
-
 static void MqttsnConnectCallback(ot::Mqttsn::ReturnCode code, void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
-		socket_platform_log(SOCKET_LOG_INFO, "Successfully connected.");
+		printf("Successfully connected.");
 		state = STATE_MQTT_CONNECTED;
 	} else {
-		socket_platform_log(SOCKET_LOG_WARN, "Connection failed with code: %d.", code);
+		printf("Connection failed with code: %d.", code);
 		state = STATE_THREAD_STARTED;
 	}
 }
@@ -88,15 +57,15 @@ static void MqttsnConnect() {
 
 	client->SetConnectCallback(MqttsnConnectCallback, nullptr);
 	client->Connect(config);
-	socket_platform_log(SOCKET_LOG_INFO, "Connecting to MQTTSN broker.");
+	printf("Connecting to MQTTSN broker.");
 }
 
 static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode code, void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
-		socket_platform_log(SOCKET_LOG_INFO, "Successfully subscribed.");
+		printf("Successfully subscribed.");
 		state = STATE_MQTT_CONNECTED;
 	} else {
-		socket_platform_log(SOCKET_LOG_WARN, "Subscription failed with code: %d.", code);
+		printf("Subscription failed with code: %d.", code);
 		state = STATE_THREAD_STARTED;
 	}
 }
@@ -104,7 +73,7 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode code, void* context) 
 static void MqttsnSubscribe() {
 	client->SetSubscribeCallback(MqttsnSubscribeCallback, nullptr);
 	client->Subscribe(DEFAULT_TOPIC);
-	socket_platform_log(SOCKET_LOG_INFO, "Subscribing to topic: %s", SOCKET_LOG_INFO);
+	printf("Subscribing to topic: %s", DEFAULT_TOPIC);
 }
 
 static void ProcessWorker() {
@@ -130,31 +99,42 @@ static void ProcessWorker() {
 }
 
 int main(int argc, char *argv[]) {
+	otError error = OT_ERROR_NONE;
+	uint16_t acquisitionId = 0;
+
 	otSysInit(argc, argv);
-	socket_platform_init();
-	button_init();
 	BOARD_InitDebugConsole();
 
     instance = &ot::Instance::InitSingle();
-    instance->GetThreadNetif().Up();
-
-    button_short_press_handler(ShortPressCallback);
+    SuccessOrExit(error = instance->GetThreadNetif().Up());
     state = STATE_INITIALIZED;
 
-    uint8_t autoStart = false;
-    instance->GetSettings().ReadThreadAutoStart(autoStart);
-    if (autoStart) {
-    	state = STATE_THREAD_STARTING;
-    }
+    // Set default network settings
+    SuccessOrExit(error = instance->GetThreadNetif().GetMac().SetNetworkName(NETWORK_NAME));
+    SuccessOrExit(error = instance->GetThreadNetif().GetMac().SetExtendedPanId({EXTPANID}));
+    SuccessOrExit(error = instance->GetThreadNetif().GetMac().SetPanId(PANID));
+    SuccessOrExit(error = instance->GetThreadNetif().GetMac().AcquireRadioChannel(&acquisitionId));
+    SuccessOrExit(error = instance->GetThreadNetif().GetMac().SetRadioChannel(acquisitionId, DEFAULT_CHANNEL));
+    SuccessOrExit(error = instance->GetThreadNetif().GetKeyManager().SetMasterKey({MASTER_KEY}));
+    instance->GetThreadNetif().GetActiveDataset().Clear();
+    instance->GetThreadNetif().GetPendingDataset().Clear();
+
+    SuccessOrExit(error = instance->GetThreadNetif().GetMle().Start(true, false));
+    state = STATE_THREAD_STARTING;
 
     while (true) {
     	instance->GetTaskletScheduler().ProcessQueuedTasklets();
     	otSysProcessDrivers(instance);
     	ProcessWorker();
     }
+    return 0;
+
+exit:
+	printf("Initialization failed with error: %d", error);
+	return 1;
 }
 
-void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
+extern "C" void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
 {
     OT_UNUSED_VARIABLE(aLogLevel);
     OT_UNUSED_VARIABLE(aLogRegion);
@@ -172,8 +152,4 @@ extern "C" void otPlatUartReceived(const uint8_t *aBuf, uint16_t aBufLength) {
 
 extern "C" void otPlatUartSendDone(void) {
     ;
-}
-
-uint32_t socket_get_millis() {
-	return otPlatAlarmMilliGetNow();
 }
