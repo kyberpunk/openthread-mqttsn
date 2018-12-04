@@ -65,7 +65,7 @@ all: openthread-mqttsn.axf
 openthread-mqttsn.axf: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: MCU C++ Linker'
-	arm-none-eabi-c++ -nostdlib -Xlinker -Map="openthread-mqttsn.map" -Xlinker --gc-sections -Xlinker -print-memory-usage -mcpu=cortex-m0plus -mthumb -T openthread-mqttsn_Debug.ld -o "openthread-mqttsn.axf" $(OBJS) $(USER_OBJS) $(LIBS)
+	arm-none-eabi-c++ -nostdlib -Xlinker -Map="openthread-mqttsn.map" -Xlinker --gc-sections -Xlinker -print-memory-usage -mcpu=cortex-m0plus -mthumb -T openthread-mqttsn_Debug.ld -u _printf_float -u _scanf_float -o "openthread-mqttsn.axf" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 	$(MAKE) --no-print-directory post-build

@@ -60,7 +60,7 @@
 /* #undef NO_MINUS_C_MINUS_O */
 
 /* Define to 1 if you want to enable CoAP to an application. */
-#define OPENTHREAD_ENABLE_APPLICATION_COAP 0
+#define OPENTHREAD_ENABLE_APPLICATION_COAP 1
 
 /* Define to 1 if you want to enable CoAP Secure to an application. */
 #define OPENTHREAD_ENABLE_APPLICATION_COAP_SECURE 0

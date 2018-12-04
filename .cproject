@@ -195,11 +195,11 @@
 							</tool>
 							<tool id="com.crt.advproject.link.cpp.exe.debug.968869454" name="MCU C++ Linker" superClass="com.crt.advproject.link.cpp.exe.debug">
 								<option id="com.crt.advproject.link.cpp.thumb.812926929" name="Thumb mode" superClass="com.crt.advproject.link.cpp.thumb" value="true" valueType="boolean"/>
-								<option id="com.crt.advproject.link.memory.load.image.cpp.856743389" name="Plain load image" superClass="com.crt.advproject.link.memory.load.image.cpp" value="" valueType="string"/>
-								<option id="com.crt.advproject.link.memory.heapAndStack.cpp.1803301866" name="Heap and Stack options" superClass="com.crt.advproject.link.memory.heapAndStack.cpp" value="&amp;Heap:Default;Post Data;Default&amp;Stack:Default;End;Default" valueType="string"/>
-								<option id="com.crt.advproject.link.memory.data.cpp.717267921" name="Global data placement" superClass="com.crt.advproject.link.memory.data.cpp" value="" valueType="string"/>
-								<option id="com.crt.advproject.link.memory.sections.cpp.1422125590" name="Extra linker script input sections" superClass="com.crt.advproject.link.memory.sections.cpp" valueType="stringList"/>
-								<option id="com.crt.advproject.link.cpp.multicore.master.userobjs.1909835216" name="Slave Objects (not visible)" superClass="com.crt.advproject.link.cpp.multicore.master.userobjs" valueType="userObjs"/>
+								<option id="com.crt.advproject.link.memory.load.image.cpp.856743389" name="Plain load image" superClass="com.crt.advproject.link.memory.load.image.cpp" useByScannerDiscovery="false" value="false;" valueType="string"/>
+								<option id="com.crt.advproject.link.memory.heapAndStack.cpp.1803301866" name="Heap and Stack options" superClass="com.crt.advproject.link.memory.heapAndStack.cpp" useByScannerDiscovery="false" value="&amp;Heap:Default;Post Data;0x4000&amp;Stack:Default;End;0x4000" valueType="string"/>
+								<option id="com.crt.advproject.link.memory.data.cpp.717267921" name="Global data placement" superClass="com.crt.advproject.link.memory.data.cpp" useByScannerDiscovery="false" value="Default" valueType="string"/>
+								<option id="com.crt.advproject.link.memory.sections.cpp.1422125590" name="Extra linker script input sections" superClass="com.crt.advproject.link.memory.sections.cpp" useByScannerDiscovery="false" valueType="stringList"/>
+								<option id="com.crt.advproject.link.cpp.multicore.master.userobjs.1909835216" name="Slave Objects (not visible)" superClass="com.crt.advproject.link.cpp.multicore.master.userobjs" useByScannerDiscovery="false" valueType="userObjs"/>
 								<option id="com.crt.advproject.link.cpp.arch.1579311960" name="Architecture" superClass="com.crt.advproject.link.cpp.arch" value="com.crt.advproject.link.cpp.target.cm0plus" valueType="enumerated"/>
 								<option id="gnu.cpp.link.option.nostart.1010399375" name="Do not use standard start files (-nostartfiles)" superClass="gnu.cpp.link.option.nostart"/>
 								<option id="gnu.cpp.link.option.nodeflibs.999532526" name="Do not use default libraries (-nodefaultlibs)" superClass="gnu.cpp.link.option.nodeflibs"/>
@@ -225,16 +225,16 @@
 								<option id="com.crt.advproject.link.cpp.lto.optmization.level.1250393606" name="Link-time optimization level" superClass="com.crt.advproject.link.cpp.lto.optmization.level"/>
 								<option id="com.crt.advproject.link.cpp.fpu.1514387904" name="Floating point" superClass="com.crt.advproject.link.cpp.fpu"/>
 								<option id="com.crt.advproject.link.cpp.manage.2053533695" name="Manage linker script" superClass="com.crt.advproject.link.cpp.manage" value="true" valueType="boolean"/>
-								<option id="com.crt.advproject.link.cpp.script.1985581078" name="Linker script" superClass="com.crt.advproject.link.cpp.script" value="openthread-mqttsn_Debug.ld" valueType="string"/>
+								<option id="com.crt.advproject.link.cpp.script.1985581078" name="Linker script" superClass="com.crt.advproject.link.cpp.script" useByScannerDiscovery="false" value="openthread-mqttsn_Debug.ld" valueType="string"/>
 								<option id="com.crt.advproject.link.cpp.scriptdir.1648675762" name="Script path" superClass="com.crt.advproject.link.cpp.scriptdir"/>
 								<option id="com.crt.advproject.link.cpp.crpenable.634342671" name="Enable automatic placement of Code Read Protection field in image" superClass="com.crt.advproject.link.cpp.crpenable"/>
 								<option id="com.crt.advproject.link.cpp.flashconfigenable.1486350915" name="Enable automatic placement of Flash Configuration field in image" superClass="com.crt.advproject.link.cpp.flashconfigenable" value="true" valueType="boolean"/>
 								<option id="com.crt.advproject.link.cpp.ecrp.1077312865" name="Enhanced CRP" superClass="com.crt.advproject.link.cpp.ecrp"/>
 								<option id="com.crt.advproject.link.cpp.hdrlib.1911867816" name="Library" superClass="com.crt.advproject.link.cpp.hdrlib" value="com.crt.advproject.cpp.link.hdrlib.newlibnano.nohost" valueType="enumerated"/>
-								<option id="com.crt.advproject.link.cpp.nanofloat.576196021" name="Enable printf float " superClass="com.crt.advproject.link.cpp.nanofloat"/>
-								<option id="com.crt.advproject.link.cpp.nanofloat.scanf.1752571899" name="Enable scanf float " superClass="com.crt.advproject.link.cpp.nanofloat.scanf"/>
+								<option id="com.crt.advproject.link.cpp.nanofloat.576196021" name="Enable printf float " superClass="com.crt.advproject.link.cpp.nanofloat" useByScannerDiscovery="false" value="true" valueType="boolean"/>
+								<option id="com.crt.advproject.link.cpp.nanofloat.scanf.1752571899" name="Enable scanf float " superClass="com.crt.advproject.link.cpp.nanofloat.scanf" useByScannerDiscovery="false" value="true" valueType="boolean"/>
 								<option id="com.crt.advproject.link.cpp.toram.905480875" name="Link application to RAM" superClass="com.crt.advproject.link.cpp.toram"/>
-								<option defaultValue="com.crt.advproject.heapAndStack.mcuXpressoStyle.cpp" id="com.crt.advproject.link.memory.heapAndStack.style.cpp.1612259029" name="Heap and Stack placement" superClass="com.crt.advproject.link.memory.heapAndStack.style.cpp" valueType="enumerated"/>
+								<option defaultValue="com.crt.advproject.heapAndStack.mcuXpressoStyle.cpp" id="com.crt.advproject.link.memory.heapAndStack.style.cpp.1612259029" name="Heap and Stack placement" superClass="com.crt.advproject.link.memory.heapAndStack.style.cpp" useByScannerDiscovery="false" valueType="enumerated"/>
 								<option id="com.crt.advproject.link.cpp.stackOffset.95245226" name="Stack offset" superClass="com.crt.advproject.link.cpp.stackOffset"/>
 								<option id="com.crt.advproject.link.cpp.multicore.slave.1490724571" name="Multicore configuration" superClass="com.crt.advproject.link.cpp.multicore.slave"/>
 								<option id="com.crt.advproject.link.cpp.multicore.master.815916059" name="Multicore master" superClass="com.crt.advproject.link.cpp.multicore.master"/>

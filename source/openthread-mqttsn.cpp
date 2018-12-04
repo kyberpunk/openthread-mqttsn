@@ -29,7 +29,6 @@ enum ApplicationState {
 	STATE_MQTT_RUNNING
 };
 
-static ot::Instance* instance = nullptr;
 static ApplicationState state = STATE_STARTED;
 static ot::Mqttsn::MqttsnClient* client = nullptr;
 
@@ -51,8 +50,8 @@ static void MqttsnReceived(const uint8_t* payload, int32_t payloadLength, void* 
 	printf("\r\n");
 }
 
-static void MqttsnConnect() {
-	client = new ot::Mqttsn::MqttsnClient(*instance);
+static void MqttsnConnect(ot::Instance &instance) {
+	client = new ot::Mqttsn::MqttsnClient(instance);
 
 	auto config = ot::Mqttsn::MqttsnConfig();
 	config.SetClientId("TEST");
@@ -85,17 +84,18 @@ static void MqttsnSubscribe() {
 	printf("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
 }
 
-static void ProcessWorker() {
+static void ProcessWorker(ot::Instance &instance) {
 	otDeviceRole role;
 	switch (state) {
 	case STATE_THREAD_STARTING:
-		role = instance->GetThreadNetif().GetMle().GetRole();
+		role = instance.GetThreadNetif().GetMle().GetRole();
 		if (role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_LEADER || role == OT_DEVICE_ROLE_ROUTER) {
+			printf("Thread up.\r\n", DEFAULT_TOPIC);
 			state = STATE_THREAD_STARTED;
 		}
 		break;
 	case STATE_THREAD_STARTED:
-		MqttsnConnect();
+		MqttsnConnect(instance);
 		state = STATE_MQTT_CONNECTING;
 		break;
 	case STATE_MQTT_CONNECTED:
@@ -114,27 +114,27 @@ int main(int argc, char *argv[]) {
 	otSysInit(argc, argv);
 	BOARD_InitDebugConsole();
 
-    instance = &ot::Instance::InitSingle();
-    SuccessOrExit(error = instance->GetThreadNetif().Up());
+	ot::Instance instance = ot::Instance::InitSingle();
+    SuccessOrExit(error = instance.GetThreadNetif().Up());
     state = STATE_INITIALIZED;
 
     // Set default network settings
-    SuccessOrExit(error = instance->GetThreadNetif().GetMac().SetNetworkName(NETWORK_NAME));
-    SuccessOrExit(error = instance->GetThreadNetif().GetMac().SetExtendedPanId({EXTPANID}));
-    SuccessOrExit(error = instance->GetThreadNetif().GetMac().SetPanId(PANID));
-    SuccessOrExit(error = instance->GetThreadNetif().GetMac().AcquireRadioChannel(&acquisitionId));
-    SuccessOrExit(error = instance->GetThreadNetif().GetMac().SetRadioChannel(acquisitionId, DEFAULT_CHANNEL));
-    SuccessOrExit(error = instance->GetThreadNetif().GetKeyManager().SetMasterKey({MASTER_KEY}));
-    instance->GetThreadNetif().GetActiveDataset().Clear();
-    instance->GetThreadNetif().GetPendingDataset().Clear();
+    SuccessOrExit(error = instance.GetThreadNetif().GetMac().SetNetworkName(NETWORK_NAME));
+    SuccessOrExit(error = instance.GetThreadNetif().GetMac().SetExtendedPanId({EXTPANID}));
+    SuccessOrExit(error = instance.GetThreadNetif().GetMac().SetPanId(PANID));
+    SuccessOrExit(error = instance.GetThreadNetif().GetMac().AcquireRadioChannel(&acquisitionId));
+    SuccessOrExit(error = instance.GetThreadNetif().GetMac().SetRadioChannel(acquisitionId, DEFAULT_CHANNEL));
+    SuccessOrExit(error = instance.GetThreadNetif().GetKeyManager().SetMasterKey({MASTER_KEY}));
+    instance.GetThreadNetif().GetActiveDataset().Clear();
+    instance.GetThreadNetif().GetPendingDataset().Clear();
 
-    SuccessOrExit(error = instance->GetThreadNetif().GetMle().Start(true, false));
+    SuccessOrExit(error = instance.GetThreadNetif().GetMle().Start(true, false));
     state = STATE_THREAD_STARTING;
 
     while (true) {
-    	instance->GetTaskletScheduler().ProcessQueuedTasklets();
-    	otSysProcessDrivers(instance);
-    	ProcessWorker();
+    	instance.GetTaskletScheduler().ProcessQueuedTasklets();
+    	otSysProcessDrivers(&instance);
+    	ProcessWorker(instance);
     }
     return 0;
 
