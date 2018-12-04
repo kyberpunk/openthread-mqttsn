@@ -3,6 +3,7 @@
 #include "mqttsn_client.hpp"
 #include "MQTTSNPacket.h"
 #include "MQTTSNConnect.h"
+#include "MQTTSNSearch.h"
 
 #define MAX_PACKET_SIZE 100
 #define MQTTSN_MIN_PACKET_LENGTH 2
@@ -17,13 +18,17 @@ MqttsnClient::MqttsnClient(Instance& aInstance)
     , mSocket(aInstance.GetThreadNetif().GetIp6().GetUdp())
 	, mIsConnected(false)
 	, mConfig()
+	, mPacketId(0)
 	, mConnectCallback(nullptr)
 	, mConnectContext(nullptr)
 	, mSubscribeCallback(nullptr)
 	, mSubscribeContext(nullptr)
-	, mPacketId(0)
 	, mDataReceivedCallback(nullptr)
-	, mDataReceivedContext(nullptr) {
+	, mDataReceivedContext(nullptr)
+	, mAdvertiseCallback(nullptr)
+	, mAdvertiseContext(nullptr)
+	, mSearchGwCallback(nullptr)
+	, mSearchGwContext(nullptr) {
 	;
 }
 
@@ -45,6 +50,7 @@ static int32_t PacketDecode(unsigned char* data, size_t length) {
 void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo) {
 	MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
 	Message &message = *static_cast<Message *>(aMessage);
+	const Ip6::MessageInfo &messageInfo = *static_cast<const Ip6::MessageInfo *>(aMessageInfo);
 
 	uint16_t offset = message.GetOffset();
 	uint16_t length = message.GetLength() - message.GetOffset();
@@ -62,8 +68,8 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		goto error;
 	}
 	switch (decodedPacketType) {
-	case MQTTSN_CONNACK:
-		int connectReturnCode;
+	case MQTTSN_CONNACK: {
+		int connectReturnCode = 0;
 		if (MQTTSNDeserialize_connack(&connectReturnCode, data, length) != 1) {
 			// TODO: Log error
 			break;
@@ -72,31 +78,32 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 			client->mConnectCallback(static_cast<ReturnCode>(connectReturnCode),
 					client->mConnectContext);
 		}
+	}
 		break;
 	case MQTTSN_SUBACK: {
 		int qos;
-		unsigned short topicId;
-		unsigned short packetId;
-		unsigned char subscribeReturnCode;
+		unsigned short topicId = 0;
+		unsigned short packetId = 0;
+		unsigned char subscribeReturnCode = 0;
 		if (MQTTSNDeserialize_suback(&qos, &topicId, &packetId,
 				&subscribeReturnCode, data, length) != 1) {
 			// TODO: Log error
 			break;
 		}
 		if (client->mSubscribeCallback != nullptr) {
-			client->mSubscribeCallback(
-					static_cast<ReturnCode>(subscribeReturnCode),
+			client->mSubscribeCallback(static_cast<ReturnCode>(subscribeReturnCode),
 					client->mSubscribeContext);
 		}
 		break;
 	}
+		break;
 	case MQTTSN_PUBLISH: {
 		int qos;
-		unsigned short packetId;
-		int payloadLength;
+		unsigned short packetId = 0;
+		int payloadLength = 0;
 		unsigned char* payload;
-		unsigned char dup;
-		unsigned char retained;
+		unsigned char dup = 0;
+		unsigned char retained = 0;
 		MQTTSN_topicid topicId;
 		if (MQTTSNDeserialize_publish(&dup, &qos, &retained, &packetId,
 				&topicId, &payload, &payloadLength, data, length) != 1) {
@@ -109,6 +116,41 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		}
 		break;
 	}
+		break;
+	case MQTTSN_ADVERTISE: {
+		unsigned char gatewayId = 0;
+		unsigned short duration = 0;
+		if (MQTTSNDeserialize_advertise(&gatewayId, &duration, data, length) != 1) {
+			// TODO: Log error
+			break;
+		}
+		if (client->mAdvertiseCallback != nullptr) {
+			client->mAdvertiseCallback(messageInfo.GetPeerAddr(), messageInfo.GetPeerPort(),
+					static_cast<uint8_t>(gatewayId), static_cast<uint32_t>(duration), client->mAdvertiseContext);
+		}
+		break;
+	}
+		break;
+	case MQTTSN_GWINFO: {
+		unsigned char gatewayId = 0;
+		unsigned short addressLength = 1;
+		unsigned char* addressText = nullptr;
+		if (MQTTSNDeserialize_gwinfo(&gatewayId, &addressLength, &addressText, data, length) != 1) {
+			// TODO: Log error
+			break;
+		}
+		if (client->mSearchGwCallback != nullptr) {
+			Ip6::Address address;
+			if (addressLength > 0) {
+				address.FromString(std::string(reinterpret_cast<char *>(addressText), static_cast<size_t>(addressLength)).c_str());
+			} else {
+				address = messageInfo.GetPeerAddr();
+			}
+			client->mSearchGwCallback(address, gatewayId, client->mSearchGwContext);
+		}
+		break;
+	}
+		break;
 	default:
 		break;
 	}
@@ -214,6 +256,18 @@ otError MqttsnClient::SetSubscribeCallback(SubscribeCallbackFunc callback, void*
 otError MqttsnClient::SetDataReceivedCallback(DataReceivedCallbackFunc callback, void* context) {
 	mDataReceivedCallback = callback;
 	mDataReceivedContext = context;
+	return OT_ERROR_NONE;
+}
+
+otError MqttsnClient::SetAdvertiseCallback(AdvertiseCallbackFunc callback, void* context) {
+	mAdvertiseCallback = callback;
+	mAdvertiseContext = context;
+	return OT_ERROR_NONE;
+}
+
+otError MqttsnClient::SetSearchGwCallback(SearchGwCallbackFunc callback, void* context) {
+	mSearchGwCallback = callback;
+	mSearchGwContext = context;
 	return OT_ERROR_NONE;
 }
 

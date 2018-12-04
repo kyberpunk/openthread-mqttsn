@@ -36,7 +36,7 @@ public:
 		;
 	}
 
-	Ip6::Address &GetAddress() {
+	const Ip6::Address &GetAddress() {
 		return mAddress;
 	}
 
@@ -52,7 +52,7 @@ public:
 		mPort = port;
 	}
 
-	std::string &GetClientId() {
+	const std::string &GetClientId() {
 		return mClientId;
 	}
 
@@ -93,6 +93,10 @@ public:
 
 	typedef void (*DataReceivedCallbackFunc)(const uint8_t* payload, int32_t payloadLength, void* context);
 
+	typedef void (*AdvertiseCallbackFunc)(const Ip6::Address &address, uint16_t port, uint8_t gatewayId, uint32_t duration, void* context);
+
+	typedef void (*SearchGwCallbackFunc)(const Ip6::Address &address, uint8_t gatewayId, void* context);
+
 	MqttsnClient(Instance &aInstance);
 
 	otError Start(uint16_t port);
@@ -109,6 +113,10 @@ public:
 
 	otError SetDataReceivedCallback(DataReceivedCallbackFunc callback, void* context);
 
+	otError SetAdvertiseCallback(AdvertiseCallbackFunc callback, void* context);
+
+	otError SetSearchGwCallback(SearchGwCallbackFunc callback, void* context);
+
 private:
 	static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
 
@@ -119,13 +127,17 @@ private:
 	Ip6::UdpSocket mSocket;
 	bool mIsConnected;
 	MqttsnConfig mConfig;
+	int32_t mPacketId;
 	ConnectCallbackFunc mConnectCallback;
 	void* mConnectContext;
 	SubscribeCallbackFunc mSubscribeCallback;
 	void* mSubscribeContext;
-	int32_t mPacketId;
 	DataReceivedCallbackFunc mDataReceivedCallback;
 	void* mDataReceivedContext;
+	AdvertiseCallbackFunc mAdvertiseCallback;
+	void* mAdvertiseContext;
+	SearchGwCallbackFunc mSearchGwCallback;
+	void* mSearchGwContext;
 };
 
 }
