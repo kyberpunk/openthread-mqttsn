@@ -11,7 +11,7 @@
 namespace ot {
 
 namespace Mqttsn {
-// TODO: Implement QoS
+// TODO: Implement QoS and DUP behavior
 
 MqttsnClient::MqttsnClient(Instance& aInstance)
     : InstanceLocator(aInstance)
@@ -30,7 +30,9 @@ MqttsnClient::MqttsnClient(Instance& aInstance)
 	, mSearchGwCallback(nullptr)
 	, mSearchGwContext(nullptr)
 	, mRegisterCallback(nullptr)
-	, mRegisterContext(nullptr) {
+	, mRegisterContext(nullptr)
+	, mPublishedCallback(nullptr)
+    , mPublishedContext(nullptr) {
 	;
 }
 
@@ -87,14 +89,14 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		unsigned short topicId = 0;
 		unsigned short packetId = 0;
 		unsigned char subscribeReturnCode = 0;
-		if (MQTTSNDeserialize_suback(&qos, &topicId, &packetId,
-				&subscribeReturnCode, data, length) != 1) {
+		if (MQTTSNDeserialize_suback(&qos, &topicId, &packetId, &subscribeReturnCode,
+				data, length) != 1) {
 			// TODO: Log error
 			break;
 		}
 		if (client->mSubscribeCallback) {
-			client->mSubscribeCallback(static_cast<ReturnCode>(subscribeReturnCode), static_cast<TopicId>(topicId),
-					client->mSubscribeContext);
+			client->mSubscribeCallback(static_cast<ReturnCode>(subscribeReturnCode),
+					static_cast<TopicId>(topicId), client->mSubscribeContext);
 		}
 	}
 		break;
@@ -112,8 +114,8 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 			break;
 		}
 		if (client->mPublishReceivedCallback) {
-			client->mPublishReceivedCallback(payload, payloadLength,
-					client->mPublishReceivedContext);
+			client->mPublishReceivedCallback(payload, payloadLength, static_cast<Qos>(qos),
+					static_cast<TopicId>(topicId.data.id), client->mPublishReceivedContext);
 		}
 	}
 		break;
@@ -160,6 +162,20 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		if (client->mRegisterCallback) {
 			client->mRegisterCallback(static_cast<ReturnCode>(returnCode), static_cast<TopicId>(topicId),
 					client->mRegisterContext);
+		}
+	}
+		break;
+	case MQTTSN_PUBACK: {
+		unsigned short topicId;
+		unsigned short packetId;
+		unsigned char returnCode;
+		if (MQTTSNDeserialize_puback(&topicId, &packetId, &returnCode, data, length) != 1) {
+			// TODO: Log error
+			break;
+		}
+		if (client->mPublishedCallback) {
+			client->mPublishedCallback(static_cast<ReturnCode>(returnCode), static_cast<TopicId>(topicId),
+					client->mPublishedContext);
 		}
 	}
 		break;
@@ -215,7 +231,7 @@ exit:
 	return error;
 }
 
-otError MqttsnClient::Subscribe(const std::string &topic) {
+otError MqttsnClient::Subscribe(const std::string &topic, Qos qos) {
 	otError error = OT_ERROR_NONE;
 	int32_t length = -1;
 	Ip6::MessageInfo messageInfo;
@@ -231,7 +247,7 @@ otError MqttsnClient::Subscribe(const std::string &topic) {
 	topicIdConfig.data.long_.name = const_cast<char *>(topic.c_str());
 	topicIdConfig.data.long_.len = topic.length();
 
-	length = MQTTSNSerialize_subscribe(buffer, MAX_PACKET_SIZE, 0, 2, mPacketId++, &topicIdConfig);
+	length = MQTTSNSerialize_subscribe(buffer, MAX_PACKET_SIZE, 0, static_cast<int>(qos), mPacketId++, &topicIdConfig);
 	if (length <= 0) {
 		error = OT_ERROR_FAILED;
 		goto exit;
@@ -255,6 +271,31 @@ otError MqttsnClient::Register(const std::string &topic) {
 
 	topicName.cstring = const_cast<char *>(topic.c_str());
 	length = MQTTSNSerialize_register(buffer, MAX_PACKET_SIZE, 0, mPacketId++, &topicName);
+	if (length <= 0) {
+		error = OT_ERROR_FAILED;
+		goto exit;
+	}
+	SuccessOrExit(error = SendMessage(buffer, length));
+
+exit:
+	return error;
+}
+
+otError MqttsnClient::Publish(const uint8_t* data, int32_t lenght, Qos qos, TopicId topicId) {
+	otError error = OT_ERROR_NONE;
+	int32_t length = -1;
+	unsigned char buffer[MAX_PACKET_SIZE];
+
+	if (!mIsConnected) {
+		error = OT_ERROR_INVALID_STATE;
+		goto exit;
+	}
+
+	MQTTSN_topicid topic;
+	topic.type = MQTTSN_TOPIC_TYPE_NORMAL;
+	topic.data.id = static_cast<unsigned short>(topicId);
+	length = MQTTSNSerialize_publish(buffer, MAX_PACKET_SIZE, 0, static_cast<int>(qos), 0,
+			mPacketId++, topic, const_cast<unsigned char *>(data), lenght);
 	if (length <= 0) {
 		error = OT_ERROR_FAILED;
 		goto exit;
@@ -298,6 +339,12 @@ otError MqttsnClient::SetSearchGwCallback(SearchGwCallbackFunc callback, void* c
 otError MqttsnClient::SetRegisterCallback(RegisterCallbackFunc callback, void* context) {
 	mRegisterCallback = callback;
 	mRegisterContext = context;
+	return OT_ERROR_NONE;
+}
+
+otError MqttsnClient::SetPublishedCallback(PublishedCallbackFunc callback, void* context) {
+	mPublishedCallback = callback;
+	mPublishedContext = context;
 	return OT_ERROR_NONE;
 }
 

@@ -45,8 +45,8 @@ static void MqttsnConnectCallback(ot::Mqttsn::ReturnCode code, void* context) {
 	}
 }
 
-static void MqttsnReceived(const uint8_t* payload, int32_t payloadLength, void* context) {
-	PRINTF("Message received:\r\n");
+static void MqttsnReceived(const uint8_t* payload, int32_t payloadLength, ot::Mqttsn::Qos qos, ot::Mqttsn::TopicId topicId, void* context) {
+	PRINTF("Message received from topic %d with QoS %d:\r\n", topicId, qos);
 	for (int i = 0; i < payloadLength; i++) {
 		PRINTF("%c", static_cast<int8_t>(payload[i]));
 	}
@@ -83,7 +83,7 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode code, ot::Mqttsn::Top
 
 static void MqttsnSubscribe() {
 	client->SetSubscribeCallback(MqttsnSubscribeCallback, nullptr);
-	client->Subscribe(DEFAULT_TOPIC);
+	client->Subscribe(DEFAULT_TOPIC, ot::Mqttsn::Qos::MQTTSN_QOS0);
 	PRINTF("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
 }
 
