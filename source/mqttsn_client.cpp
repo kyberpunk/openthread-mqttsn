@@ -189,30 +189,21 @@ otError MqttsnClient::Stop() {
 
 otError MqttsnClient::Connect(MqttsnConfig &config) {
 	otError error = OT_ERROR_NONE;
-	char* clientIdString = nullptr;
+	int32_t length = -1;
 	MQTTSNPacket_connectData options = MQTTSNPacket_connectData_initializer;
-	int32_t length = 0;
 
 	if (mIsConnected) {
 		error = OT_ERROR_INVALID_STATE;
 		goto exit;
 	}
-
-	clientIdString = new char[config.GetClientId().length() + 1];
-	if (clientIdString == nullptr) {
-		error = OT_ERROR_NO_BUFS;
-		goto exit;
-	}
-	strcpy(clientIdString, config.GetClientId().c_str());
 	MQTTSNString clientId;
-	clientId.cstring = clientIdString;
+	clientId.cstring = const_cast<char *>(config.GetClientId().c_str());
 	options.clientID = clientId;
 	options.duration = config.GetDuration();
 	options.cleansession = static_cast<unsigned char>(config.GetCleanSession());
 
 	unsigned char buffer[MAX_PACKET_SIZE];
 	length = MQTTSNSerialize_connect(buffer, MAX_PACKET_SIZE, &options);
-	delete[] clientIdString;
 	if (length <= 0) {
 		error = OT_ERROR_FAILED;
 		goto exit;
@@ -226,23 +217,21 @@ exit:
 
 otError MqttsnClient::Subscribe(const std::string &topic) {
 	otError error = OT_ERROR_NONE;
+	int32_t length = -1;
 	Ip6::MessageInfo messageInfo;
-	int32_t length = 0;
 	MQTTSN_topicid topicIdConfig;
 	unsigned char buffer[MAX_PACKET_SIZE];
 
-	char* topicString = new char[topic.length() + 1];
-	if (!topicString) {
-		error = OT_ERROR_NO_BUFS;
+	if (!mIsConnected) {
+		error = OT_ERROR_INVALID_STATE;
 		goto exit;
 	}
-	strcpy(topicString, topic.c_str());
+
 	topicIdConfig.type = MQTTSN_TOPIC_TYPE_NORMAL;
-	topicIdConfig.data.long_.name = topicString;
+	topicIdConfig.data.long_.name = const_cast<char *>(topic.c_str());
 	topicIdConfig.data.long_.len = topic.length();
 
 	length = MQTTSNSerialize_subscribe(buffer, MAX_PACKET_SIZE, 0, 2, mPacketId++, &topicIdConfig);
-	delete[] topicString;
 	if (length <= 0) {
 		error = OT_ERROR_FAILED;
 		goto exit;
@@ -255,17 +244,17 @@ exit:
 
 otError MqttsnClient::Register(const std::string &topic) {
 	otError error = OT_ERROR_NONE;
+	int32_t length = -1;
 	MQTTSNString topicName;
 	unsigned char buffer[MAX_PACKET_SIZE];
-	int length = -1;
-	char *topicNameStr = new char[topic.length() + 1];
-	if (!topicNameStr) {
-		error = OT_ERROR_NO_BUFS;
+
+	if (!mIsConnected) {
+		error = OT_ERROR_INVALID_STATE;
 		goto exit;
 	}
-	topicName.cstring = topicNameStr;
+
+	topicName.cstring = const_cast<char *>(topic.c_str());
 	length = MQTTSNSerialize_register(buffer, MAX_PACKET_SIZE, 0, mPacketId++, &topicName);
-	delete[] topicNameStr;
 	if (length <= 0) {
 		error = OT_ERROR_FAILED;
 		goto exit;
