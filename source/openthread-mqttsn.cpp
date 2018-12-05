@@ -66,7 +66,7 @@ static void MqttsnConnect(ot::Instance &instance) {
 	config.SetAddress(address);
 
 	client->SetConnectCallback(MqttsnConnectCallback, nullptr);
-	client->SetDataReceivedCallback(MqttsnReceived, nullptr);
+	client->SetPublishReceivedCallback(MqttsnReceived, nullptr);
 	client->Connect(config);
 	PRINTF("Connecting to MQTTSN broker.\r\n");
 }
