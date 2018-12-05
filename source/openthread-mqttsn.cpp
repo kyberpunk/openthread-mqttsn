@@ -6,6 +6,9 @@
 #include "openthread/instance.h"
 #include "openthread-system.h"
 #include "board.h"
+#include "fsl_debug_console.h"
+
+// TODO: Implement log output with OT platform implementation
 
 #include "mqttsn_client.hpp"
 
@@ -34,20 +37,20 @@ static ot::Mqttsn::MqttsnClient* client = nullptr;
 
 static void MqttsnConnectCallback(ot::Mqttsn::ReturnCode code, void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
-		printf("Successfully connected.\r\n");
+		PRINTF("Successfully connected.\r\n");
 		state = STATE_MQTT_CONNECTED;
 	} else {
-		printf("Connection failed with code: %d.\r\n", code);
+		PRINTF("Connection failed with code: %d.\r\n", code);
 		state = STATE_THREAD_STARTED;
 	}
 }
 
 static void MqttsnReceived(const uint8_t* payload, int32_t payloadLength, void* context) {
-	printf("Message received:\r\n");
+	PRINTF("Message received:\r\n");
 	for (int i = 0; i < payloadLength; i++) {
-		printf("%c", static_cast<int8_t>(payload[i]));
+		PRINTF("%c", static_cast<int8_t>(payload[i]));
 	}
-	printf("\r\n");
+	PRINTF("\r\n");
 }
 
 static void MqttsnConnect(ot::Instance &instance) {
@@ -65,15 +68,15 @@ static void MqttsnConnect(ot::Instance &instance) {
 	client->SetConnectCallback(MqttsnConnectCallback, nullptr);
 	client->SetDataReceivedCallback(MqttsnReceived, nullptr);
 	client->Connect(config);
-	printf("Connecting to MQTTSN broker.\r\n");
+	PRINTF("Connecting to MQTTSN broker.\r\n");
 }
 
 static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode code, void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
-		printf("Successfully subscribed.\r\n");
+		PRINTF("Successfully subscribed.\r\n");
 		state = STATE_MQTT_RUNNING;
 	} else {
-		printf("Subscription failed with code: %d.\r\n", code);
+		PRINTF("Subscription failed with code: %d.\r\n", code);
 		state = STATE_MQTT_CONNECTED;
 	}
 }
@@ -81,7 +84,7 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode code, void* context) 
 static void MqttsnSubscribe() {
 	client->SetSubscribeCallback(MqttsnSubscribeCallback, nullptr);
 	client->Subscribe(DEFAULT_TOPIC);
-	printf("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
+	PRINTF("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
 }
 
 static void ProcessWorker(ot::Instance &instance) {
@@ -90,7 +93,7 @@ static void ProcessWorker(ot::Instance &instance) {
 	case STATE_THREAD_STARTING:
 		role = instance.GetThreadNetif().GetMle().GetRole();
 		if (role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_LEADER || role == OT_DEVICE_ROLE_ROUTER) {
-			printf("Thread up.\r\n", DEFAULT_TOPIC);
+			PRINTF("Thread started.\r\n");
 			state = STATE_THREAD_STARTED;
 		}
 		break;
@@ -114,22 +117,24 @@ int main(int argc, char *argv[]) {
 	otSysInit(argc, argv);
 	BOARD_InitDebugConsole();
 
-	ot::Instance instance = ot::Instance::InitSingle();
-    SuccessOrExit(error = instance.GetThreadNetif().Up());
+	ot::Instance &instance = ot::Instance::InitSingle();
+	ot::ThreadNetif &netif = instance.GetThreadNetif();
+    SuccessOrExit(error = netif.Up());
     state = STATE_INITIALIZED;
 
     // Set default network settings
-    SuccessOrExit(error = instance.GetThreadNetif().GetMac().SetNetworkName(NETWORK_NAME));
-    SuccessOrExit(error = instance.GetThreadNetif().GetMac().SetExtendedPanId({EXTPANID}));
-    SuccessOrExit(error = instance.GetThreadNetif().GetMac().SetPanId(PANID));
-    SuccessOrExit(error = instance.GetThreadNetif().GetMac().AcquireRadioChannel(&acquisitionId));
-    SuccessOrExit(error = instance.GetThreadNetif().GetMac().SetRadioChannel(acquisitionId, DEFAULT_CHANNEL));
-    SuccessOrExit(error = instance.GetThreadNetif().GetKeyManager().SetMasterKey({MASTER_KEY}));
-    instance.GetThreadNetif().GetActiveDataset().Clear();
-    instance.GetThreadNetif().GetPendingDataset().Clear();
+    SuccessOrExit(error = netif.GetMac().SetNetworkName(NETWORK_NAME));
+    SuccessOrExit(error = netif.GetMac().SetExtendedPanId({EXTPANID}));
+    SuccessOrExit(error = netif.GetMac().SetPanId(PANID));
+    SuccessOrExit(error = netif.GetMac().AcquireRadioChannel(&acquisitionId));
+    SuccessOrExit(error = netif.GetMac().SetRadioChannel(acquisitionId, DEFAULT_CHANNEL));
+    SuccessOrExit(error = netif.GetKeyManager().SetMasterKey({MASTER_KEY}));
+    netif.GetActiveDataset().Clear();
+    netif.GetPendingDataset().Clear();
 
-    SuccessOrExit(error = instance.GetThreadNetif().GetMle().Start(true, false));
+    SuccessOrExit(error = netif.GetMle().Start(true, false));
     state = STATE_THREAD_STARTING;
+    PRINTF("Thread starting.\r\n");
 
     while (true) {
     	instance.GetTaskletScheduler().ProcessQueuedTasklets();
@@ -139,7 +144,7 @@ int main(int argc, char *argv[]) {
     return 0;
 
 exit:
-	printf("Initialization failed with error: %d\r\n", error);
+	PRINTF("Initialization failed with error: %d\r\n", error);
 	return 1;
 }
 
@@ -151,7 +156,7 @@ extern "C" void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const ch
 
     va_list ap;
     va_start(ap, aFormat);
-    vprintf(aFormat, ap);
+    PRINTF(aFormat, ap);
     va_end(ap);
 }
 
