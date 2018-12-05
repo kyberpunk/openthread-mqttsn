@@ -93,7 +93,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 			break;
 		}
 		if (client->mSubscribeCallback) {
-			client->mSubscribeCallback(static_cast<ReturnCode>(subscribeReturnCode),
+			client->mSubscribeCallback(static_cast<ReturnCode>(subscribeReturnCode), static_cast<TopicId>(topicId),
 					client->mSubscribeContext);
 		}
 	}

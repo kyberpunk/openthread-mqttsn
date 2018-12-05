@@ -91,7 +91,7 @@ class MqttsnClient : public InstanceLocator
 public:
 	typedef void (*ConnectCallbackFunc)(ReturnCode code, void* context);
 
-	typedef void (*SubscribeCallbackFunc)(ReturnCode code, void* context);
+	typedef void (*SubscribeCallbackFunc)(ReturnCode code, TopicId topicId, void* context);
 
 	typedef void (*PublishReceivedCallbackFunc)(const uint8_t* payload, int32_t payloadLength, void* context);
 

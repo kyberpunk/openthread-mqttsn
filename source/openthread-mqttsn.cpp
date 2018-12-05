@@ -71,9 +71,9 @@ static void MqttsnConnect(ot::Instance &instance) {
 	PRINTF("Connecting to MQTTSN broker.\r\n");
 }
 
-static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode code, void* context) {
+static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode code, ot::Mqttsn::TopicId topicId ,void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
-		PRINTF("Successfully subscribed.\r\n");
+		PRINTF("Successfully subscribed to topic: %d.\r\n", topicId);
 		state = STATE_MQTT_RUNNING;
 	} else {
 		PRINTF("Subscription failed with code: %d.\r\n", code);
