@@ -12,6 +12,7 @@ namespace ot {
 
 namespace Mqttsn {
 // TODO: Implement QoS and DUP behavior
+// TODO: Implement logging
 
 MqttsnClient::MqttsnClient(Instance& instance)
     : InstanceLocator(instance)
@@ -73,6 +74,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		// TODO: Log error
 		goto error;
 	}
+	// TODO: Refactor switch to use separate handle functions
 	switch (decodedPacketType) {
 	case MQTTSN_CONNACK: {
 		int connectReturnCode = 0;
@@ -87,6 +89,11 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 	}
 		break;
 	case MQTTSN_SUBACK: {
+		if (!client->mIsConnected) {
+			// TODO: Log error
+			break;
+		}
+
 		int qos;
 		unsigned short topicId = 0;
 		unsigned short packetId = 0;
@@ -103,6 +110,11 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 	}
 		break;
 	case MQTTSN_PUBLISH: {
+		if (!client->mIsConnected) {
+			// TODO: Log error
+			break;
+		}
+
 		int qos;
 		unsigned short packetId = 0;
 		int payloadLength = 0;
@@ -154,6 +166,11 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 	}
 		break;
 	case MQTTSN_REGACK: {
+		if (!client->mIsConnected) {
+			// TODO: Log error
+			break;
+		}
+
 		unsigned short topicId;
 		unsigned short packetId;
 		unsigned char returnCode;
@@ -168,6 +185,11 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 	}
 		break;
 	case MQTTSN_PUBACK: {
+		if (!client->mIsConnected) {
+			// TODO: Log error
+			break;
+		}
+
 		unsigned short topicId;
 		unsigned short packetId;
 		unsigned char returnCode;
@@ -182,6 +204,11 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 	}
 		break;
 	case MQTTSN_UNSUBACK: {
+		if (!client->mIsConnected) {
+			// TODO: Log error
+			break;
+		}
+
 		unsigned short packetId;
 		if (MQTTSNDeserialize_unsuback(&packetId, data, length) != 1) {
 			// TODO: Log error
@@ -189,6 +216,26 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		}
 		if (client->mUnsubscribedCallback) {
 			client->mUnsubscribedCallback(client->mUnsubscribedContext);
+		}
+	}
+		break;
+	case MQTTSN_PINGREQ: {
+		MQTTSNString clientId;
+		if (MQTTSNDeserialize_pingreq(&clientId, data, length) != 1) {
+			// TODO: Log error
+			break;
+		}
+
+		int32_t packetLength = -1;
+		unsigned char buffer[MAX_PACKET_SIZE];
+		packetLength = MQTTSNSerialize_pingresp(buffer, MAX_PACKET_SIZE);
+		if (packetLength <= 0) {
+			// TODO: Log error
+			break;
+		}
+		if (client->SendMessage(buffer, packetLength, messageInfo.GetPeerAddr(), messageInfo.GetPeerPort()) != OT_ERROR_NONE) {
+			// TODO: Log error
+			break;
 		}
 	}
 		break;
