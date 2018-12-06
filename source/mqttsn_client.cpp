@@ -13,9 +13,9 @@ namespace ot {
 namespace Mqttsn {
 // TODO: Implement QoS and DUP behavior
 
-MqttsnClient::MqttsnClient(Instance& aInstance)
-    : InstanceLocator(aInstance)
-    , mSocket(aInstance.GetThreadNetif().GetIp6().GetUdp())
+MqttsnClient::MqttsnClient(Instance& instance)
+    : InstanceLocator(instance)
+    , mSocket(GetInstance().GetThreadNetif().GetIp6().GetUdp())
 	, mIsConnected(false)
 	, mConfig()
 	, mPacketId(0)
@@ -32,7 +32,9 @@ MqttsnClient::MqttsnClient(Instance& aInstance)
 	, mRegisterCallback(nullptr)
 	, mRegisterContext(nullptr)
 	, mPublishedCallback(nullptr)
-    , mPublishedContext(nullptr) {
+    , mPublishedContext(nullptr)
+	, mUnsubscribedCallback(nullptr)
+    , mUnsubscribedContext(nullptr) {
 	;
 }
 
@@ -179,6 +181,17 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		}
 	}
 		break;
+	case MQTTSN_UNSUBACK: {
+		unsigned short packetId;
+		if (MQTTSNDeserialize_unsuback(&packetId, data, length) != 1) {
+			// TODO: Log error
+			break;
+		}
+		if (client->mUnsubscribedCallback) {
+			client->mUnsubscribedCallback(client->mUnsubscribedContext);
+		}
+	}
+		break;
 	default:
 		break;
 	}
@@ -243,6 +256,12 @@ otError MqttsnClient::Subscribe(const std::string &topic, Qos qos) {
 		goto exit;
 	}
 
+	// TODO: Implement QoS
+	if (qos != Qos::MQTTSN_QOS0) {
+		error = OT_ERROR_NOT_IMPLEMENTED;
+		goto exit;
+	}
+
 	topicIdConfig.type = MQTTSN_TOPIC_TYPE_NORMAL;
 	topicIdConfig.data.long_.name = const_cast<char *>(topic.c_str());
 	topicIdConfig.data.long_.len = topic.length();
@@ -291,11 +310,41 @@ otError MqttsnClient::Publish(const uint8_t* data, int32_t lenght, Qos qos, Topi
 		goto exit;
 	}
 
+	// TODO: Implement QoS
+	if (qos != Qos::MQTTSN_QOS0) {
+		error = OT_ERROR_NOT_IMPLEMENTED;
+		goto exit;
+	}
+
 	MQTTSN_topicid topic;
 	topic.type = MQTTSN_TOPIC_TYPE_NORMAL;
 	topic.data.id = static_cast<unsigned short>(topicId);
 	length = MQTTSNSerialize_publish(buffer, MAX_PACKET_SIZE, 0, static_cast<int>(qos), 0,
 			mPacketId++, topic, const_cast<unsigned char *>(data), lenght);
+	if (length <= 0) {
+		error = OT_ERROR_FAILED;
+		goto exit;
+	}
+	SuccessOrExit(error = SendMessage(buffer, length));
+
+exit:
+	return error;
+}
+
+otError MqttsnClient::Unsubscribe(TopicId topicId) {
+	otError error = OT_ERROR_NONE;
+	int32_t length = -1;
+	unsigned char buffer[MAX_PACKET_SIZE];
+
+	if (!mIsConnected) {
+		error = OT_ERROR_INVALID_STATE;
+		goto exit;
+	}
+
+	MQTTSN_topicid topic;
+	topic.type = MQTTSN_TOPIC_TYPE_NORMAL;
+	topic.data.id = static_cast<unsigned short>(topicId);
+	length = MQTTSNSerialize_unsubscribe(buffer, MAX_PACKET_SIZE, mPacketId++, &topic);
 	if (length <= 0) {
 		error = OT_ERROR_FAILED;
 		goto exit;
@@ -345,6 +394,12 @@ otError MqttsnClient::SetRegisterCallback(RegisterCallbackFunc callback, void* c
 otError MqttsnClient::SetPublishedCallback(PublishedCallbackFunc callback, void* context) {
 	mPublishedCallback = callback;
 	mPublishedContext = context;
+	return OT_ERROR_NONE;
+}
+
+otError MqttsnClient::SetUnsubscribedCallback(UnsubscribedCallbackFunc callback, void* context) {
+	mUnsubscribedCallback = callback;
+	mUnsubscribedContext = context;
 	return OT_ERROR_NONE;
 }
 

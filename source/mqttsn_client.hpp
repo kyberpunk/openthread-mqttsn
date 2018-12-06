@@ -105,6 +105,8 @@ public:
 
 	typedef void (*PublishedCallbackFunc)(ReturnCode code, TopicId topicId, void* context);
 
+	typedef void (*UnsubscribedCallbackFunc)(void* context);
+
 	MqttsnClient(Instance &aInstance);
 
 	otError Start(uint16_t port);
@@ -120,6 +122,8 @@ public:
 
 	otError Publish(const uint8_t* data, int32_t lenght, Qos qos, TopicId topicId);
 
+	otError Unsubscribe(TopicId topicId);
+
 	otError SetConnectCallback(ConnectCallbackFunc callback, void* context);
 
 	otError SetSubscribeCallback(SubscribeCallbackFunc callback, void* context);
@@ -133,6 +137,8 @@ public:
 	otError SetRegisterCallback(RegisterCallbackFunc callback, void* context);
 
 	otError SetPublishedCallback(PublishedCallbackFunc callback, void* context);
+
+	otError SetUnsubscribedCallback(UnsubscribedCallbackFunc callback, void* context);
 
 private:
 	static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
@@ -159,6 +165,8 @@ private:
 	void* mRegisterContext;
 	PublishedCallbackFunc mPublishedCallback;
 	void* mPublishedContext;
+	UnsubscribedCallbackFunc mUnsubscribedCallback;
+	void* mUnsubscribedContext;
 };
 
 }

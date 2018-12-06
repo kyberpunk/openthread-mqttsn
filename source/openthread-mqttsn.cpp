@@ -55,7 +55,6 @@ static void MqttsnReceived(const uint8_t* payload, int32_t payloadLength, ot::Mq
 
 static void MqttsnConnect(ot::Instance &instance) {
 	client = new ot::Mqttsn::MqttsnClient(instance);
-
 	auto config = ot::Mqttsn::MqttsnConfig();
 	config.SetClientId("TEST");
 	config.SetDuration(3600);
