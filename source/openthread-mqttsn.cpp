@@ -5,6 +5,8 @@
 #include "openthread/platform/uart.h"
 #include "openthread/instance.h"
 #include "openthread-system.h"
+#include "openthread/platform/alarm-milli.h"
+
 #include "board.h"
 #include "fsl_debug_console.h"
 
@@ -22,6 +24,7 @@
 #define GATEWAY_PORT 10000
 #define GATEWAY_ADDRESS ""
 #define DEFAULT_TOPIC "test"
+#define CONNECTION_TIMEOUT 3000
 
 enum ApplicationState {
 	STATE_STARTED,
@@ -35,6 +38,7 @@ enum ApplicationState {
 
 static ApplicationState state = STATE_STARTED;
 static ot::Mqttsn::MqttsnClient* client = nullptr;
+static uint32_t connectionTimeoutTime = 0;
 
 static void MqttsnConnectedCallback(ot::Mqttsn::ReturnCode code, void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
@@ -103,8 +107,14 @@ static void ProcessWorker(ot::Instance &instance) {
 		break;
 	case STATE_THREAD_STARTED:
 		MqttsnConnect(instance);
+		connectionTimeoutTime = otPlatAlarmMilliGetNow() + CONNECTION_TIMEOUT;
 		state = STATE_MQTT_CONNECTING;
 		break;
+	case STATE_MQTT_CONNECTING:
+		if (connectionTimeoutTime < otPlatAlarmMilliGetNow()) {
+			PRINTF("Connection timeout.\r\n");
+			state = STATE_THREAD_STARTED;
+		}
 	case STATE_MQTT_CONNECTED:
 		MqttsnSubscribe();
 		state = STATE_MQTT_RUNNING;
@@ -162,7 +172,7 @@ extern "C" void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const ch
 
     va_list ap;
     va_start(ap, aFormat);
-    PRINTF(aFormat, ap);
+    VPRINTF(aFormat, ap);
     va_end(ap);
 }
 

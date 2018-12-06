@@ -9,6 +9,8 @@
 #include "net/udp6.hpp"
 #include "openthread/error.h"
 
+// TODO: Implement message queue and message specific callback
+
 namespace ot {
 
 namespace Mqttsn {
@@ -158,7 +160,7 @@ private:
 	Ip6::UdpSocket mSocket;
 	bool mIsConnected;
 	MqttsnConfig mConfig;
-	int32_t mPacketId;
+	uint16_t mPacketId;
 	bool mIsSleeping;
 	ConnectCallbackFunc mConnectCallback;
 	void* mConnectContext;

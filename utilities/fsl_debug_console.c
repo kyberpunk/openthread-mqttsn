@@ -407,6 +407,15 @@ int DbgConsole_Printf(const char *fmt_s, ...)
     return result;
 }
 
+int DbgConsole_Vprintf(const char *fmt, va_list ap)
+{
+	if (s_debugConsole.type == DEBUG_CONSOLE_DEVICE_TYPE_NONE)
+	{
+		return -1;
+	}
+	return DbgConsole_PrintfFormattedData(DbgConsole_Putchar, fmt, ap);
+}
+
 /* See fsl_debug_console.h for documentation of this function. */
 int DbgConsole_Putchar(int ch)
 {

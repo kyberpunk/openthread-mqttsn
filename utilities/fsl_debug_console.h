@@ -44,6 +44,7 @@
 #ifndef _FSL_DEBUGCONSOLE_H_
 #define _FSL_DEBUGCONSOLE_H_
 
+#include <stdarg.h>
 #include "fsl_common.h"
 
 /*
@@ -86,11 +87,13 @@
 
 #if SDK_DEBUGCONSOLE /* Select printf, scanf, putchar, getchar of SDK version. */
 #define PRINTF DbgConsole_Printf
+#define VPRINTF DbgConsole_Vprintf
 #define SCANF DbgConsole_Scanf
 #define PUTCHAR DbgConsole_Putchar
 #define GETCHAR DbgConsole_Getchar
 #else /* Select printf, scanf, putchar, getchar of toolchain. */
 #define PRINTF printf
+#define VPRINTF vprintf
 #define SCANF scanf
 #define PUTCHAR putchar
 #define GETCHAR getchar
@@ -150,6 +153,8 @@ status_t DbgConsole_Deinit(void);
  * @return  Returns the number of characters printed or a negative value if an error occurs.
  */
 int DbgConsole_Printf(const char *fmt_s, ...);
+
+int DbgConsole_Vprintf(const char *fmt, va_list ap);
 
 /*!
  * @brief Writes a character to stdout.

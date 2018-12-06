@@ -4,6 +4,7 @@
 #include "MQTTSNPacket.h"
 #include "MQTTSNConnect.h"
 #include "MQTTSNSearch.h"
+#include "fsl_debug_console.h"
 
 #define MAX_PACKET_SIZE 255
 #define MQTTSN_MIN_PACKET_LENGTH 2
@@ -12,7 +13,7 @@ namespace ot {
 
 namespace Mqttsn {
 // TODO: Implement QoS and DUP behavior
-// TODO: Implement logging
+// TODO: Implement OT logging
 // TODO: Implement client ping messages
 // TODO: Implement timeouts
 
@@ -69,30 +70,39 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 	uint16_t length = message.GetLength() - message.GetOffset();
 
 	if (length > MAX_PACKET_SIZE) {
-		// TODO: Log error
 		return;
 	}
 
 	unsigned char* data = new unsigned char[length];
 	if (!data) {
-		// TODO: Log error
 		return;
 	}
 	message.Read(offset, length, data);
 
+	// Dump packet
+	PRINTF("UDP message received:\r\n");
+	for (int32_t i = 0; i < length; i++) {
+		if (i > 0) {
+			PRINTF(" ");
+		}
+		PRINTF("%02X", data[i]);
+	}
+	PRINTF("\r\n");
+
 	int32_t decodedPacketType = PacketDecode(data, length);
 	if (decodedPacketType == MQTTSNPACKET_READ_ERROR) {
-		// TODO: Log error
 		goto error;
 	}
+	PRINTF("Packet type: %d\r\n", decodedPacketType);
+
 	// TODO: Refactor switch to use separate handle functions
 	switch (decodedPacketType) {
 	case MQTTSN_CONNACK: {
 		int connectReturnCode = 0;
 		if (MQTTSNDeserialize_connack(&connectReturnCode, data, length) != 1) {
-			// TODO: Log error
 			break;
 		}
+		client->mIsConnected = true;
 		if (client->mConnectCallback) {
 			client->mConnectCallback(static_cast<ReturnCode>(connectReturnCode),
 					client->mConnectContext);
@@ -101,7 +111,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		break;
 	case MQTTSN_SUBACK: {
 		if (!client->mIsConnected) {
-			// TODO: Log error
 			break;
 		}
 
@@ -111,7 +120,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		unsigned char subscribeReturnCode = 0;
 		if (MQTTSNDeserialize_suback(&qos, &topicId, &packetId, &subscribeReturnCode,
 				data, length) != 1) {
-			// TODO: Log error
 			break;
 		}
 		if (client->mSubscribeCallback) {
@@ -122,7 +130,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		break;
 	case MQTTSN_PUBLISH: {
 		if (!client->mIsConnected) {
-			// TODO: Log error
 			break;
 		}
 
@@ -135,7 +142,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		MQTTSN_topicid topicId;
 		if (MQTTSNDeserialize_publish(&dup, &qos, &retained, &packetId,
 				&topicId, &payload, &payloadLength, data, length) != 1) {
-			// TODO: Log error
 			break;
 		}
 		if (client->mPublishReceivedCallback) {
@@ -148,7 +154,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		unsigned char gatewayId = 0;
 		unsigned short duration = 0;
 		if (MQTTSNDeserialize_advertise(&gatewayId, &duration, data, length) != 1) {
-			// TODO: Log error
 			break;
 		}
 		if (client->mAdvertiseCallback) {
@@ -162,7 +167,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		unsigned short addressLength = 1;
 		unsigned char* addressText = nullptr;
 		if (MQTTSNDeserialize_gwinfo(&gatewayId, &addressLength, &addressText, data, length) != 1) {
-			// TODO: Log error
 			break;
 		}
 		if (client->mSearchGwCallback) {
@@ -178,7 +182,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		break;
 	case MQTTSN_REGACK: {
 		if (!client->mIsConnected) {
-			// TODO: Log error
 			break;
 		}
 
@@ -186,7 +189,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		unsigned short packetId;
 		unsigned char returnCode;
 		if (MQTTSNDeserialize_regack(&topicId, &packetId, &returnCode, data, length) != 1) {
-			// TODO: Log error
 			break;
 		}
 		if (client->mRegisterCallback) {
@@ -197,7 +199,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		break;
 	case MQTTSN_PUBACK: {
 		if (!client->mIsConnected) {
-			// TODO: Log error
 			break;
 		}
 
@@ -205,7 +206,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		unsigned short packetId;
 		unsigned char returnCode;
 		if (MQTTSNDeserialize_puback(&topicId, &packetId, &returnCode, data, length) != 1) {
-			// TODO: Log error
 			break;
 		}
 		if (client->mPublishedCallback) {
@@ -216,13 +216,11 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		break;
 	case MQTTSN_UNSUBACK: {
 		if (!client->mIsConnected) {
-			// TODO: Log error
 			break;
 		}
 
 		unsigned short packetId;
 		if (MQTTSNDeserialize_unsuback(&packetId, data, length) != 1) {
-			// TODO: Log error
 			break;
 		}
 		if (client->mUnsubscribedCallback) {
@@ -233,7 +231,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 	case MQTTSN_PINGREQ: {
 		MQTTSNString clientId;
 		if (MQTTSNDeserialize_pingreq(&clientId, data, length) != 1) {
-			// TODO: Log error
 			break;
 		}
 
@@ -241,24 +238,20 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		unsigned char buffer[MAX_PACKET_SIZE];
 		packetLength = MQTTSNSerialize_pingresp(buffer, MAX_PACKET_SIZE);
 		if (packetLength <= 0) {
-			// TODO: Log error
 			break;
 		}
 		if (client->SendMessage(buffer, packetLength, messageInfo.GetPeerAddr(), messageInfo.GetPeerPort()) != OT_ERROR_NONE) {
-			// TODO: Log error
 			break;
 		}
 	}
 		break;
 	case MQTTSN_DISCONNECT: {
 		if (!client->mIsConnected || client->mIsSleeping) {
-			// TODO: Log error
 			break;
 		}
 
 		int duration;
 		if (MQTTSNDeserialize_disconnect(&duration, data, length) != 1) {
-			// TODO: Log error
 			break;
 		}
 		client->mIsConnected = false;
