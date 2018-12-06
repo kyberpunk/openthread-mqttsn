@@ -5,7 +5,7 @@
 #include "MQTTSNConnect.h"
 #include "MQTTSNSearch.h"
 
-#define MAX_PACKET_SIZE 100
+#define MAX_PACKET_SIZE 255
 #define MQTTSN_MIN_PACKET_LENGTH 2
 
 namespace ot {
@@ -13,6 +13,8 @@ namespace ot {
 namespace Mqttsn {
 // TODO: Implement QoS and DUP behavior
 // TODO: Implement logging
+// TODO: Implement client ping messages
+// TODO: Implement timeouts
 
 MqttsnClient::MqttsnClient(Instance& instance)
     : InstanceLocator(instance)
@@ -20,6 +22,7 @@ MqttsnClient::MqttsnClient(Instance& instance)
 	, mIsConnected(false)
 	, mConfig()
 	, mPacketId(0)
+	, mIsSleeping(false)
 	, mConnectCallback(nullptr)
 	, mConnectContext(nullptr)
 	, mSubscribeCallback(nullptr)
@@ -35,7 +38,9 @@ MqttsnClient::MqttsnClient(Instance& instance)
 	, mPublishedCallback(nullptr)
     , mPublishedContext(nullptr)
 	, mUnsubscribedCallback(nullptr)
-    , mUnsubscribedContext(nullptr) {
+    , mUnsubscribedContext(nullptr)
+	, mDisconnectedCallback(nullptr)
+	, mDisconnectedContext(nullptr) {
 	;
 }
 
@@ -54,6 +59,7 @@ static int32_t PacketDecode(unsigned char* data, size_t length) {
 	return data[lenlen]; // return the packet type
 }
 
+// TODO: Verify sender address
 void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo) {
 	MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
 	Message &message = *static_cast<Message *>(aMessage);
@@ -61,6 +67,11 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 
 	uint16_t offset = message.GetOffset();
 	uint16_t length = message.GetLength() - message.GetOffset();
+
+	if (length > MAX_PACKET_SIZE) {
+		// TODO: Log error
+		return;
+	}
 
 	unsigned char* data = new unsigned char[length];
 	if (!data) {
@@ -239,6 +250,23 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		}
 	}
 		break;
+	case MQTTSN_DISCONNECT: {
+		if (!client->mIsConnected || client->mIsSleeping) {
+			// TODO: Log error
+			break;
+		}
+
+		int duration;
+		if (MQTTSNDeserialize_disconnect(&duration, data, length) != 1) {
+			// TODO: Log error
+			break;
+		}
+		client->mIsConnected = false;
+		if (client->mDisconnectedCallback) {
+			client->mDisconnectedCallback(client->mDisconnectedContext);
+		}
+	}
+		break;
 	default:
 		break;
 	}
@@ -402,7 +430,33 @@ exit:
 	return error;
 }
 
-otError MqttsnClient::SetConnectCallback(ConnectCallbackFunc callback, void* context) {
+otError MqttsnClient::Disconnect() {
+	otError error = OT_ERROR_NONE;
+	int32_t length = -1;
+	unsigned char buffer[MAX_PACKET_SIZE];
+
+	if (!mIsConnected) {
+		error = OT_ERROR_INVALID_STATE;
+		goto exit;
+	}
+
+	length = MQTTSNSerialize_disconnect(buffer, MAX_PACKET_SIZE, 0);
+	if (length <= 0) {
+		error = OT_ERROR_FAILED;
+		goto exit;
+	}
+	SuccessOrExit(error = SendMessage(buffer, length));
+
+exit:
+	return error;
+}
+
+otError MqttsnClient::Sleep() {
+	// TODO: Implement sleep
+	return OT_ERROR_NOT_IMPLEMENTED;
+}
+
+otError MqttsnClient::SetConnectedCallback(ConnectCallbackFunc callback, void* context) {
 	mConnectCallback = callback;
 	mConnectContext = context;
 	return OT_ERROR_NONE;
@@ -447,6 +501,12 @@ otError MqttsnClient::SetPublishedCallback(PublishedCallbackFunc callback, void*
 otError MqttsnClient::SetUnsubscribedCallback(UnsubscribedCallbackFunc callback, void* context) {
 	mUnsubscribedCallback = callback;
 	mUnsubscribedContext = context;
+	return OT_ERROR_NONE;
+}
+
+otError MqttsnClient::SetDisconnectedCallback(DisconnectedCallbackFunc callback, void* context) {
+	mDisconnectedCallback = callback;
+	mDisconnectedContext = context;
 	return OT_ERROR_NONE;
 }
 

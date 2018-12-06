@@ -9,6 +9,7 @@
 #include "fsl_debug_console.h"
 
 // TODO: Implement log output with OT platform implementation
+// TODO: Implement connect retry
 
 #include "mqttsn_client.hpp"
 
@@ -35,7 +36,7 @@ enum ApplicationState {
 static ApplicationState state = STATE_STARTED;
 static ot::Mqttsn::MqttsnClient* client = nullptr;
 
-static void MqttsnConnectCallback(ot::Mqttsn::ReturnCode code, void* context) {
+static void MqttsnConnectedCallback(ot::Mqttsn::ReturnCode code, void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
 		PRINTF("Successfully connected.\r\n");
 		state = STATE_MQTT_CONNECTED;
@@ -43,6 +44,11 @@ static void MqttsnConnectCallback(ot::Mqttsn::ReturnCode code, void* context) {
 		PRINTF("Connection failed with code: %d.\r\n", code);
 		state = STATE_THREAD_STARTED;
 	}
+}
+
+static void MqttsnDisconnectedCallback(void* context) {
+	PRINTF("Client disconnected.\r\n");
+	state = STATE_THREAD_STARTED;
 }
 
 static void MqttsnReceived(const uint8_t* payload, int32_t payloadLength, ot::Mqttsn::Qos qos, ot::Mqttsn::TopicId topicId, void* context) {
@@ -54,7 +60,6 @@ static void MqttsnReceived(const uint8_t* payload, int32_t payloadLength, ot::Mq
 }
 
 static void MqttsnConnect(ot::Instance &instance) {
-	client = new ot::Mqttsn::MqttsnClient(instance);
 	auto config = ot::Mqttsn::MqttsnConfig();
 	config.SetClientId("TEST");
 	config.SetDuration(3600);
@@ -63,8 +68,8 @@ static void MqttsnConnect(ot::Instance &instance) {
 	auto address = ot::Ip6::Address();
 	address.FromString(GATEWAY_ADDRESS);
 	config.SetAddress(address);
-
-	client->SetConnectCallback(MqttsnConnectCallback, nullptr);
+	client->SetConnectedCallback(MqttsnConnectedCallback, nullptr);
+	client->SetDisconnectedCallback(MqttsnDisconnectedCallback, nullptr);
 	client->SetPublishReceivedCallback(MqttsnReceived, nullptr);
 	client->Connect(config);
 	PRINTF("Connecting to MQTTSN broker.\r\n");
@@ -132,6 +137,8 @@ int main(int argc, char *argv[]) {
     netif.GetPendingDataset().Clear();
 
     SuccessOrExit(error = netif.GetMle().Start(true, false));
+
+    client = new ot::Mqttsn::MqttsnClient(instance);
     state = STATE_THREAD_STARTING;
     PRINTF("Thread starting.\r\n");
 

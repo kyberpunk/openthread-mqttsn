@@ -107,6 +107,8 @@ public:
 
 	typedef void (*UnsubscribedCallbackFunc)(void* context);
 
+	typedef void (*DisconnectedCallbackFunc)(void* context);
+
 	MqttsnClient(Instance &aInstance);
 
 	otError Start(uint16_t port);
@@ -124,7 +126,11 @@ public:
 
 	otError Unsubscribe(TopicId topicId);
 
-	otError SetConnectCallback(ConnectCallbackFunc callback, void* context);
+	otError Disconnect(void);
+
+	otError Sleep(void);
+
+	otError SetConnectedCallback(ConnectCallbackFunc callback, void* context);
 
 	otError SetSubscribeCallback(SubscribeCallbackFunc callback, void* context);
 
@@ -140,6 +146,8 @@ public:
 
 	otError SetUnsubscribedCallback(UnsubscribedCallbackFunc callback, void* context);
 
+	otError SetDisconnectedCallback(DisconnectedCallbackFunc callback, void* context);
+
 private:
 	static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
 
@@ -151,6 +159,7 @@ private:
 	bool mIsConnected;
 	MqttsnConfig mConfig;
 	int32_t mPacketId;
+	bool mIsSleeping;
 	ConnectCallbackFunc mConnectCallback;
 	void* mConnectContext;
 	SubscribeCallbackFunc mSubscribeCallback;
@@ -167,6 +176,8 @@ private:
 	void* mPublishedContext;
 	UnsubscribedCallbackFunc mUnsubscribedCallback;
 	void* mUnsubscribedContext;
+	DisconnectedCallbackFunc mDisconnectedCallback;
+	void* mDisconnectedContext;
 };
 
 }
