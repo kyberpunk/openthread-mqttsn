@@ -117,6 +117,8 @@ public:
 
 	otError Stop(void);
 
+	otError ProcessMessages(void);
+
 	otError Connect(MqttsnConfig &config);
 
 	// TODO: Overload for other topic types

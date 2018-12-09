@@ -284,6 +284,10 @@ otError MqttsnClient::Stop() {
 	return mSocket.Close();
 }
 
+otError MqttsnClient::ProcessMessages() {
+	return OT_ERROR_NONE;
+}
+
 otError MqttsnClient::Connect(MqttsnConfig &config) {
 	otError error = OT_ERROR_NONE;
 	int32_t length = -1;
