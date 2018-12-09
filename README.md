@@ -8,3 +8,4 @@ The project is in very early stage of development, it may change over time. Docu
 * [OpenThread Border Router GitHub](https://github.com/openthread/borderrouter)
 * [MQTT-SN Specification](http://mqtt.org/new/wp-content/uploads/2009/06/MQTT-SN_spec_v1.2.pdf)
 * [Eclipse Paho MQTT-SN serialization and gateway](https://github.com/eclipse/paho.mqtt-sn.embedded-c)
+* [NXP Kinetis SDK](https://www.nxp.com/support/developer-resources/evaluation-and-development-boards/freedom-development-boards/mcu-boards/software-development-kit-for-kinetis-mcus:KINETIS-SDK)
