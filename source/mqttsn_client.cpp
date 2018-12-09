@@ -22,7 +22,7 @@ MqttsnClient::MqttsnClient(Instance& instance)
     , mSocket(GetInstance().GetThreadNetif().GetIp6().GetUdp())
 	, mIsConnected(false)
 	, mConfig()
-	, mPacketId(0)
+	, mPacketId(1)
 	, mIsSleeping(false)
 	, mConnectCallback(nullptr)
 	, mConnectContext(nullptr)
@@ -273,7 +273,7 @@ otError MqttsnClient::Start(uint16_t port) {
 	Ip6::SockAddr sockaddr;
 	sockaddr.mPort = port;
 
-	SuccessOrExit(error = mSocket.Open(&MqttsnClient::HandleUdpReceive, this));
+	SuccessOrExit(error = mSocket.Open(MqttsnClient::HandleUdpReceive, this));
 	SuccessOrExit(error = mSocket.Bind(sockaddr));
 
 exit:
@@ -293,6 +293,8 @@ otError MqttsnClient::Connect(MqttsnConfig &config) {
 		error = OT_ERROR_INVALID_STATE;
 		goto exit;
 	}
+	mConfig = config;
+
 	MQTTSNString clientId;
 	clientId.cstring = const_cast<char *>(config.GetClientId().c_str());
 	options.clientID = clientId;
@@ -307,7 +309,6 @@ otError MqttsnClient::Connect(MqttsnConfig &config) {
 	}
 	SuccessOrExit(error = SendMessage(buffer, length));
 
-	mConfig = config;
 exit:
 	return error;
 }
@@ -508,24 +509,19 @@ otError MqttsnClient::SendMessage(unsigned char* buffer, int32_t length) {
 }
 
 otError MqttsnClient::SendMessage(unsigned char* buffer, int32_t length, const Ip6::Address &address, uint16_t port) {
+	otError error = OT_ERROR_NONE;
 	Ip6::MessageInfo messageInfo;
 	Message *message = nullptr;
 
-	otError error = OT_ERROR_NONE;
-	message->Write(0, length, buffer);
-	message->SetOffset(0);
+	VerifyOrExit((message = mSocket.NewMessage(0)) != nullptr,
+            error = OT_ERROR_NO_BUFS);
+	message->Append(buffer, length);
 
 	messageInfo.SetPeerAddr(address);
 	messageInfo.SetPeerPort(port);
 	messageInfo.SetInterfaceId(OT_NETIF_INTERFACE_ID_THREAD);
 
-	SuccessOrExit(error = mSocket.SendTo(*message, messageInfo));
-
-	otMessageSettings settings;
-	settings.mLinkSecurityEnabled = false;
-	settings.mPriority = OT_MESSAGE_PRIORITY_NORMAL;
-	VerifyOrExit((message = mSocket.NewMessage(length, &settings)) != nullptr,
-            error = OT_ERROR_NO_BUFS);
+	PRINTF("Sending message to %s[:%u]\r\n", messageInfo.GetPeerAddr().ToString().AsCString(), messageInfo.GetPeerPort());
 	SuccessOrExit(error = mSocket.SendTo(*message, messageInfo));
 
 exit:

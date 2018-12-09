@@ -6,6 +6,7 @@
 #include "openthread/instance.h"
 #include "openthread-system.h"
 #include "openthread/platform/alarm-milli.h"
+#include "utils/slaac_address.hpp"
 
 #include "board.h"
 #include "fsl_debug_console.h"
@@ -15,16 +16,20 @@
 
 #include "mqttsn_client.hpp"
 
-#define NETWORK_NAME "OpenThreadDemo"
-#define PANID 0x1234
-#define EXTPANID {0x11, 0x11, 0x11, 0x11, 0x22, 0x22, 0x22, 0x22}
+#define NETWORK_NAME "OTBR4444"
+#define PANID 0x4444
+#define EXTPANID {0x33, 0x33, 0x33, 0x33, 0x44, 0x44, 0x44, 0x44}
 #define DEFAULT_CHANNEL 15
-#define MASTER_KEY {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
+#define MASTER_KEY {0x33, 0x33, 0x44, 0x44, 0x33, 0x33, 0x44, 0x44, 0x33, 0x33, 0x44, 0x44, 0x33, 0x33, 0x44, 0x44}
 
 #define GATEWAY_PORT 10000
-#define GATEWAY_ADDRESS ""
+//#define GATEWAY_ADDRESS "2018:ff9b::c0a8:2d"
+#define GATEWAY_ADDRESS "2018:ff9b::ac12:8"
 #define DEFAULT_TOPIC "test"
 #define CONNECTION_TIMEOUT 3000
+
+#define CLIENT_ID "THREAD"
+#define CLIENT_PORT 11111
 
 enum ApplicationState {
 	STATE_STARTED,
@@ -39,6 +44,7 @@ enum ApplicationState {
 static ApplicationState state = STATE_STARTED;
 static ot::Mqttsn::MqttsnClient* client = nullptr;
 static uint32_t connectionTimeoutTime = 0;
+static otNetifAddress slaacAddresses[OPENTHREAD_CONFIG_NUM_SLAAC_ADDRESSES];
 
 static void MqttsnConnectedCallback(ot::Mqttsn::ReturnCode code, void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
@@ -65,7 +71,7 @@ static void MqttsnReceived(const uint8_t* payload, int32_t payloadLength, ot::Mq
 
 static void MqttsnConnect(ot::Instance &instance) {
 	auto config = ot::Mqttsn::MqttsnConfig();
-	config.SetClientId("TEST");
+	config.SetClientId(CLIENT_ID);
 	config.SetDuration(3600);
 	config.SetCleanSession(true);
 	config.SetPort(GATEWAY_PORT);
@@ -75,14 +81,22 @@ static void MqttsnConnect(ot::Instance &instance) {
 	client->SetConnectedCallback(MqttsnConnectedCallback, nullptr);
 	client->SetDisconnectedCallback(MqttsnDisconnectedCallback, nullptr);
 	client->SetPublishReceivedCallback(MqttsnReceived, nullptr);
-	client->Connect(config);
-	PRINTF("Connecting to MQTTSN broker.\r\n");
+
+	otError error = OT_ERROR_NONE;
+	if ((error = client->Connect(config)) == OT_ERROR_NONE) {
+		PRINTF("Connecting to MQTTSN broker.\r\n");
+	} else {
+		PRINTF("Connection failed with error: %d.\r\n", error);
+	}
 }
 
 static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode code, ot::Mqttsn::TopicId topicId ,void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
 		PRINTF("Successfully subscribed to topic: %d.\r\n", topicId);
 		state = STATE_MQTT_RUNNING;
+
+		std::string data = "hello";
+		client->Publish(reinterpret_cast<const uint8_t *>(data.c_str()), data.length(), ot::Mqttsn::Qos::MQTTSN_QOS0, topicId);
 	} else {
 		PRINTF("Subscription failed with code: %d.\r\n", code);
 		state = STATE_MQTT_CONNECTED;
@@ -101,7 +115,7 @@ static void ProcessWorker(ot::Instance &instance) {
 	case STATE_THREAD_STARTING:
 		role = instance.GetThreadNetif().GetMle().GetRole();
 		if (role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_LEADER || role == OT_DEVICE_ROLE_ROUTER) {
-			PRINTF("Thread started.\r\n");
+			PRINTF("Thread started. Role: %d.\r\n", role);
 			state = STATE_THREAD_STARTED;
 		}
 		break;
@@ -112,9 +126,16 @@ static void ProcessWorker(ot::Instance &instance) {
 		break;
 	case STATE_MQTT_CONNECTING:
 		if (connectionTimeoutTime < otPlatAlarmMilliGetNow()) {
-			PRINTF("Connection timeout.\r\n");
+			role = instance.GetThreadNetif().GetMle().GetRole();
+			PRINTF("Connection timeout. Role: %d\r\n", role);
+			auto address = instance.GetThreadNetif().GetUnicastAddresses();
+			while (address != nullptr) {
+				PRINTF("%s\r\n", address->GetAddress().ToString().AsCString());
+				address = address->GetNext();
+			}
 			state = STATE_THREAD_STARTED;
 		}
+		break;
 	case STATE_MQTT_CONNECTED:
 		MqttsnSubscribe();
 		state = STATE_MQTT_RUNNING;
@@ -124,19 +145,30 @@ static void ProcessWorker(ot::Instance &instance) {
 	}
 }
 
+void HandleNetifStateChanged(otChangedFlags aFlags, void *aContext) {
+	ot::Instance &instance = *static_cast<ot::Instance *>(aContext);
+	VerifyOrExit((aFlags & OT_CHANGED_THREAD_NETDATA) != 0);
+
+	ot::Utils::Slaac::UpdateAddresses(&instance, slaacAddresses, sizeof(slaacAddresses), ot::Utils::Slaac::CreateRandomIid, nullptr);
+
+exit:
+	return;
+}
+
 int main(int argc, char *argv[]) {
 	otError error = OT_ERROR_NONE;
 	uint16_t acquisitionId = 0;
 
+	memset(slaacAddresses, 0, sizeof(slaacAddresses));
 	otSysInit(argc, argv);
 	BOARD_InitDebugConsole();
 
 	ot::Instance &instance = ot::Instance::InitSingle();
-	ot::ThreadNetif &netif = instance.GetThreadNetif();
-    SuccessOrExit(error = netif.Up());
+	instance.GetNotifier().RegisterCallback(HandleNetifStateChanged, &instance);
     state = STATE_INITIALIZED;
 
     // Set default network settings
+    ot::ThreadNetif &netif = instance.GetThreadNetif();
     SuccessOrExit(error = netif.GetMac().SetNetworkName(NETWORK_NAME));
     SuccessOrExit(error = netif.GetMac().SetExtendedPanId({EXTPANID}));
     SuccessOrExit(error = netif.GetMac().SetPanId(PANID));
@@ -146,9 +178,11 @@ int main(int argc, char *argv[]) {
     netif.GetActiveDataset().Clear();
     netif.GetPendingDataset().Clear();
 
+    SuccessOrExit(error = netif.Up());
     SuccessOrExit(error = netif.GetMle().Start(true, false));
 
     client = new ot::Mqttsn::MqttsnClient(instance);
+    SuccessOrExit(error = client->Start(CLIENT_PORT));
     state = STATE_THREAD_STARTING;
     PRINTF("Thread starting.\r\n");
 

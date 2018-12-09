@@ -5,7 +5,7 @@
  * Generated linker script file for MKW41Z512xxx4
  * Created from linkscript.ldt by FMCreateLinkLibraries
  * Using Freemarker v2.3.23
- * MCUXpresso IDE v10.2.1 [Build 795] [2018-07-25]  on Dec 6, 2018 12:51:09 PM
+ * MCUXpresso IDE v10.2.1 [Build 795] [2018-07-25]  on 9.12.2018 0:22:24
  */
 
 INCLUDE "openthread-mqttsn_Debug_library.ld"
@@ -149,7 +149,7 @@ SECTIONS
     } > SRAM
 
     /* Reserve and place Heap within memory map */
-    _HeapSize = 0x8000;
+    _HeapSize = 0x4000;
     .heap :  ALIGN(4)
     {
         _pvHeapStart = .;

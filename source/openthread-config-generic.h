@@ -126,7 +126,7 @@
 #define OPENTHREAD_ENABLE_MAC_FILTER 0
 
 /* Define to 1 to build MTD library. */
-#define OPENTHREAD_ENABLE_MTD 0
+#define OPENTHREAD_ENABLE_MTD 1
 
 /* Define to 1 to enable network diagnostic for MTD. */
 #define OPENTHREAD_ENABLE_MTD_NETWORK_DIAGNOSTIC 0
