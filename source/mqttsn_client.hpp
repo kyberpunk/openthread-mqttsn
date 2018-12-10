@@ -35,6 +35,14 @@ enum DisconnectType {
 	MQTTSN_DISCONNECT_TIMEOUT
 };
 
+enum ClientState {
+	MQTTSN_STATE_DISCONNECTED,
+	MQTTSN_STATE_ACTIVE,
+	MQTTSN_STATE_ASLEEP,
+	MQTTSN_STATE_AWAKE,
+	MQTTSN_STATE_LOST,
+};
+
 typedef uint16_t TopicId;
 
 class MqttsnConfig {
@@ -148,7 +156,11 @@ public:
 
 	otError Disconnect(void);
 
-	otError Sleep(void);
+	otError Sleep(uint16_t duration);
+
+	otError Awake(uint32_t timeout);
+
+	ClientState GetState(ClientState state);
 
 	otError SetConnectedCallback(ConnectCallbackFunc callback, void* context);
 
@@ -180,13 +192,12 @@ private:
 	void SetDisconnected(void);
 
 	Ip6::UdpSocket mSocket;
-	bool mIsConnected;
 	MqttsnConfig mConfig;
 	uint16_t mPacketId;
-	bool mIsSleeping;
 	uint32_t mPingReqTime;
 	uint32_t mGwTimeout;
 	bool mDisconnectRequested;
+	ClientState mClientState;
 	ConnectCallbackFunc mConnectCallback;
 	void* mConnectContext;
 	SubscribeCallbackFunc mSubscribeCallback;
