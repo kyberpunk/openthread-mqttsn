@@ -7,6 +7,7 @@
 #include "fsl_debug_console.h"
 
 #define MAX_PACKET_SIZE 255
+#define KEEP_ALIVE_DELAY 5
 #define MQTTSN_MIN_PACKET_LENGTH 2
 
 namespace ot {
@@ -24,6 +25,7 @@ MqttsnClient::MqttsnClient(Instance& instance)
 	, mConfig()
 	, mPacketId(1)
 	, mIsSleeping(false)
+	, mPingReqTime(0)
 	, mConnectCallback(nullptr)
 	, mConnectContext(nullptr)
 	, mSubscribeCallback(nullptr)
@@ -254,7 +256,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		if (MQTTSNDeserialize_disconnect(&duration, data, length) != 1) {
 			break;
 		}
-		client->mIsConnected = false;
 		if (client->mDisconnectedCallback) {
 			client->mDisconnectedCallback(client->mDisconnectedContext);
 		}
@@ -284,7 +285,12 @@ otError MqttsnClient::Stop() {
 	return mSocket.Close();
 }
 
-otError MqttsnClient::ProcessMessages() {
+otError MqttsnClient::Process() {
+	// Process ping
+	if (mIsConnected && mPingReqTime != 0 && mPingReqTime <= TimerMilli::GetNow()) {
+		PingGateway();
+	}
+
 	return OT_ERROR_NONE;
 }
 
@@ -302,7 +308,7 @@ otError MqttsnClient::Connect(MqttsnConfig &config) {
 	MQTTSNString clientId;
 	clientId.cstring = const_cast<char *>(config.GetClientId().c_str());
 	options.clientID = clientId;
-	options.duration = config.GetDuration();
+	options.duration = config.GetKeepAlive();
 	options.cleansession = static_cast<unsigned char>(config.GetCleanSession());
 
 	unsigned char buffer[MAX_PACKET_SIZE];
@@ -438,6 +444,9 @@ otError MqttsnClient::Disconnect() {
 		goto exit;
 	}
 
+	mIsConnected = false;
+	mPingReqTime = 0;
+
 	length = MQTTSNSerialize_disconnect(buffer, MAX_PACKET_SIZE, 0);
 	if (length <= 0) {
 		error = OT_ERROR_FAILED;
@@ -528,10 +537,38 @@ otError MqttsnClient::SendMessage(unsigned char* buffer, int32_t length, const I
 	PRINTF("Sending message to %s[:%u]\r\n", messageInfo.GetPeerAddr().ToString().AsCString(), messageInfo.GetPeerPort());
 	SuccessOrExit(error = mSocket.SendTo(*message, messageInfo));
 
+	if (mIsConnected) {
+		mPingReqTime = TimerMilli::GetNow() + (mConfig.GetKeepAlive() - KEEP_ALIVE_DELAY) * 1000;
+	}
+
 exit:
 	if (error != OT_ERROR_NONE && message != NULL) {
         message->Free();
     }
+	return error;
+}
+
+otError MqttsnClient::PingGateway() {
+	otError error = OT_ERROR_NONE;
+	int32_t length = -1;
+	unsigned char buffer[MAX_PACKET_SIZE];
+
+	if (!mIsConnected) {
+		error = OT_ERROR_INVALID_STATE;
+		goto exit;
+	}
+
+	MQTTSNString clientId;
+	clientId.cstring = const_cast<char *>(mConfig.GetClientId().c_str());
+	length = MQTTSNSerialize_pingreq(buffer, MAX_PACKET_SIZE, clientId);
+
+	if (length <= 0) {
+		error = OT_ERROR_FAILED;
+		goto exit;
+	}
+	SuccessOrExit(error = SendMessage(buffer, length));
+
+exit:
 	return error;
 }
 

@@ -37,7 +37,7 @@ public:
 		: mAddress()
 		, mPort()
 		, mClientId()
-		, mDuration()
+		, mKeepAlive(30)
 		, mCleanSession() {
 		;
 	}
@@ -66,12 +66,12 @@ public:
 		mClientId = clientId;
 	}
 
-	int16_t GetDuration() {
-		return mDuration;
+	int16_t GetKeepAlive() {
+		return mKeepAlive;
 	}
 
-	void SetDuration(int16_t duration) {
-		mDuration = duration;
+	void SetKeepAlive(int16_t duration) {
+		mKeepAlive = duration;
 	}
 
 	bool GetCleanSession() {
@@ -86,8 +86,9 @@ private:
 	Ip6::Address mAddress;
 	uint16_t mPort;
 	std::string mClientId;
-	int16_t mDuration;
+	uint16_t mKeepAlive;
 	bool mCleanSession;
+
 };
 
 class MqttsnClient : public InstanceLocator
@@ -117,7 +118,7 @@ public:
 
 	otError Stop(void);
 
-	otError ProcessMessages(void);
+	otError Process(void);
 
 	otError Connect(MqttsnConfig &config);
 
@@ -159,11 +160,14 @@ private:
 
 	otError SendMessage(unsigned char* buffer, int32_t length, const Ip6::Address &address, uint16_t port);
 
+	otError PingGateway(void);
+
 	Ip6::UdpSocket mSocket;
 	bool mIsConnected;
 	MqttsnConfig mConfig;
 	uint16_t mPacketId;
 	bool mIsSleeping;
+	uint32_t mPingReqTime;
 	ConnectCallbackFunc mConnectCallback;
 	void* mConnectContext;
 	SubscribeCallbackFunc mSubscribeCallback;

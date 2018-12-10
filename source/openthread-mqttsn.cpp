@@ -72,7 +72,7 @@ static void MqttsnReceived(const uint8_t* payload, int32_t payloadLength, ot::Mq
 static void MqttsnConnect(ot::Instance &instance) {
 	auto config = ot::Mqttsn::MqttsnConfig();
 	config.SetClientId(CLIENT_ID);
-	config.SetDuration(3600);
+	config.SetKeepAlive(30);
 	config.SetCleanSession(true);
 	config.SetPort(GATEWAY_PORT);
 	auto address = ot::Ip6::Address();
@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
     	instance.GetTaskletScheduler().ProcessQueuedTasklets();
     	otSysProcessDrivers(&instance);
     	ProcessWorker(instance);
-    	client->ProcessMessages();
+    	client->Process();
     }
     return 0;
 
