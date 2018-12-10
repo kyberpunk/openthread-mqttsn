@@ -56,8 +56,8 @@ static void MqttsnConnectedCallback(ot::Mqttsn::ReturnCode code, void* context) 
 	}
 }
 
-static void MqttsnDisconnectedCallback(void* context) {
-	PRINTF("Client disconnected.\r\n");
+static void MqttsnDisconnectedCallback(ot::Mqttsn::DisconnectType type, void* context) {
+	PRINTF("Client disconnected. Reason: %d.\r\n", type);
 	state = STATE_THREAD_STARTED;
 }
 

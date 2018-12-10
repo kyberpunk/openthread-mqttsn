@@ -29,6 +29,12 @@ enum Qos {
 	MQTTSN_QOSm1 = 0x3
 };
 
+enum DisconnectType {
+	MQTTSN_DISCONNECT_SERVER,
+	MQTTSN_DISCONNECT_CLIENT,
+	MQTTSN_DISCONNECT_TIMEOUT
+};
+
 typedef uint16_t TopicId;
 
 class MqttsnConfig {
@@ -38,7 +44,8 @@ public:
 		, mPort()
 		, mClientId()
 		, mKeepAlive(30)
-		, mCleanSession() {
+		, mCleanSession()
+		, mGatewayTimeout(10) {
 		;
 	}
 
@@ -82,12 +89,21 @@ public:
 		mCleanSession = cleanSession;
 	}
 
+	uint32_t GetGatewayTimeout() {
+		return mGatewayTimeout;
+	}
+
+	void SetGatewayTimeout(uint32_t timeout) {
+		mGatewayTimeout = timeout;
+	}
+
 private:
 	Ip6::Address mAddress;
 	uint16_t mPort;
 	std::string mClientId;
 	uint16_t mKeepAlive;
 	bool mCleanSession;
+	uint32_t mGatewayTimeout;
 };
 
 class MqttsnClient : public InstanceLocator
@@ -109,7 +125,7 @@ public:
 
 	typedef void (*UnsubscribedCallbackFunc)(void* context);
 
-	typedef void (*DisconnectedCallbackFunc)(void* context);
+	typedef void (*DisconnectedCallbackFunc)(DisconnectType type, void* context);
 
 	MqttsnClient(Instance &aInstance);
 
@@ -161,12 +177,16 @@ private:
 
 	otError PingGateway(void);
 
+	void SetDisconnected(void);
+
 	Ip6::UdpSocket mSocket;
 	bool mIsConnected;
 	MqttsnConfig mConfig;
 	uint16_t mPacketId;
 	bool mIsSleeping;
 	uint32_t mPingReqTime;
+	uint32_t mGwTimeout;
+	bool mDisconnectRequested;
 	ConnectCallbackFunc mConnectCallback;
 	void* mConnectContext;
 	SubscribeCallbackFunc mSubscribeCallback;
