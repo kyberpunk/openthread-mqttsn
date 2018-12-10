@@ -25,6 +25,7 @@ MqttsnClient::MqttsnClient(Instance& instance)
 	, mPingReqTime(0)
 	, mGwTimeout(0)
 	, mDisconnectRequested(false)
+	, mSleepRequested(false)
 	, mClientState(MQTTSN_STATE_DISCONNECTED)
 	, mConnectCallback(nullptr)
 	, mConnectContext(nullptr)
@@ -256,22 +257,43 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 			break;
 		}
 		client->mGwTimeout = 0;
+		if (client->mClientState == MQTTSN_STATE_AWAKE) {
+			client->mClientState = MQTTSN_STATE_ASLEEP;
+			if (client->mDisconnectedCallback) {
+				client->mDisconnectedCallback(MQTTSN_DISCONNECT_ASLEEP, client->mDisconnectedContext);
+			}
+		}
 	}
 		break;
 	case MQTTSN_DISCONNECT: {
-		if (client->mClientState != MQTTSN_STATE_ACTIVE) {
-			break;
-		}
 
 		int duration;
 		if (MQTTSNDeserialize_disconnect(&duration, data, length) != 1) {
 			break;
 		}
-		client->mClientState = MQTTSN_STATE_DISCONNECTED;
 		client->SetDisconnected();
+
+		DisconnectType reason = MQTTSN_DISCONNECT_SERVER;
+		switch (client->mClientState) {
+		case MQTTSN_STATE_ACTIVE:
+		case MQTTSN_STATE_AWAKE:
+		case MQTTSN_STATE_ASLEEP:
+			if (client->mDisconnectRequested) {
+				client->mClientState = MQTTSN_STATE_DISCONNECTED;
+				reason = MQTTSN_DISCONNECT_SERVER;
+			} else if (client->mSleepRequested) {
+				client->mClientState = MQTTSN_STATE_ASLEEP;
+				reason = MQTTSN_DISCONNECT_ASLEEP;
+			} else {
+				client->mClientState = MQTTSN_STATE_DISCONNECTED;
+				reason = MQTTSN_DISCONNECT_SERVER;
+			}
+			break;
+		default:
+			break;
+		}
 		if (client->mDisconnectedCallback) {
-			client->mDisconnectedCallback(client->mDisconnectRequested ? MQTTSN_DISCONNECT_CLIENT : MQTTSN_DISCONNECT_SERVER,
-					client->mDisconnectedContext);
+			client->mDisconnectedCallback(reason, client->mDisconnectedContext);
 		}
 	}
 		break;
@@ -297,7 +319,13 @@ exit:
 
 otError MqttsnClient::Stop() {
 	return mSocket.Close();
-	SetDisconnected();
+	if (mClientState != MQTTSN_STATE_DISCONNECTED && mClientState != MQTTSN_STATE_LOST) {
+		mClientState = MQTTSN_STATE_DISCONNECTED;
+		SetDisconnected();
+		if (mDisconnectedCallback) {
+			mDisconnectedCallback(MQTTSN_DISCONNECT_CLIENT, mDisconnectedContext);
+		}
+	}
 }
 
 otError MqttsnClient::Process() {
@@ -308,6 +336,7 @@ otError MqttsnClient::Process() {
 	// Process pingreq
 	if (mClientState != MQTTSN_STATE_ACTIVE && mPingReqTime != 0 && mPingReqTime <= now) {
 		SuccessOrExit(error = PingGateway());
+		mGwTimeout = TimerMilli::GetNow() + mConfig.GetGatewayTimeout() * 1000;
 	}
 
 	// Handle timeout
@@ -348,8 +377,9 @@ otError MqttsnClient::Connect(MqttsnConfig &config) {
 	}
 	SuccessOrExit(error = SendMessage(buffer, length));
 
-	mGwTimeout = TimerMilli::GetNow() + mConfig.GetGatewayTimeout() * 1000;
 	mDisconnectRequested = false;
+	mSleepRequested = false;
+	mGwTimeout = TimerMilli::GetNow() + mConfig.GetGatewayTimeout() * 1000;
 	mPingReqTime = TimerMilli::GetNow() + mConfig.GetKeepAlive() * 1000;
 
 exit:
@@ -472,7 +502,7 @@ otError MqttsnClient::Disconnect() {
 	int32_t length = -1;
 	unsigned char buffer[MAX_PACKET_SIZE];
 
-	if (mClientState != MQTTSN_STATE_ACTIVE && mClientState != MQTTSN_STATE_AWAKE) {
+	if (mClientState != MQTTSN_STATE_ACTIVE && mClientState != MQTTSN_STATE_AWAKE && mClientState != MQTTSN_STATE_ASLEEP) {
 		error = OT_ERROR_INVALID_STATE;
 		goto exit;
 	}
@@ -484,6 +514,7 @@ otError MqttsnClient::Disconnect() {
 	}
 	SuccessOrExit(error = SendMessage(buffer, length));
 
+	mDisconnectRequested = true;
 	mGwTimeout = TimerMilli::GetNow() + mConfig.GetGatewayTimeout() * 1000;
 
 exit:
@@ -491,12 +522,43 @@ exit:
 }
 
 otError MqttsnClient::Sleep(uint16_t duration) {
-	// TODO: Implement sleep
-	return OT_ERROR_NOT_IMPLEMENTED;
+	otError error = OT_ERROR_NONE;
+	int32_t length = -1;
+	unsigned char buffer[MAX_PACKET_SIZE];
+
+	if (mClientState != MQTTSN_STATE_ACTIVE && mClientState != MQTTSN_STATE_AWAKE && mClientState != MQTTSN_STATE_ASLEEP) {
+		error = OT_ERROR_INVALID_STATE;
+		goto exit;
+	}
+
+	length = MQTTSNSerialize_disconnect(buffer, MAX_PACKET_SIZE, duration);
+	if (length <= 0) {
+		error = OT_ERROR_FAILED;
+		goto exit;
+	}
+
+	SuccessOrExit(error = SendMessage(buffer, length));
+
+	mSleepRequested = true;
+	mGwTimeout = TimerMilli::GetNow() + mConfig.GetGatewayTimeout() * 1000;
+
+exit:
+	return error;
 }
 
 otError MqttsnClient::Awake(uint32_t timeout) {
-	return OT_ERROR_NOT_IMPLEMENTED;
+	otError error = OT_ERROR_NONE;
+	if (mClientState != MQTTSN_STATE_AWAKE && mClientState != MQTTSN_STATE_ASLEEP) {
+		error = OT_ERROR_INVALID_STATE;
+		goto exit;
+	}
+
+	SuccessOrExit(error = PingGateway());
+
+	mClientState = MQTTSN_STATE_AWAKE;
+	mGwTimeout = TimerMilli::GetNow() + timeout * 1000;
+exit:
+	return error;
 }
 
 ClientState MqttsnClient::GetState(ClientState state) {
@@ -577,7 +639,7 @@ otError MqttsnClient::SendMessage(unsigned char* buffer, int32_t length, const I
 	PRINTF("Sending message to %s[:%u]\r\n", messageInfo.GetPeerAddr().ToString().AsCString(), messageInfo.GetPeerPort());
 	SuccessOrExit(error = mSocket.SendTo(*message, messageInfo));
 
-	if (mClientState != MQTTSN_STATE_ACTIVE) {
+	if (mClientState == MQTTSN_STATE_ACTIVE) {
 		mPingReqTime = TimerMilli::GetNow() + (mConfig.GetKeepAlive() - KEEP_ALIVE_DELAY) * 1000;
 	}
 
@@ -608,14 +670,13 @@ otError MqttsnClient::PingGateway() {
 	}
 	SuccessOrExit(error = SendMessage(buffer, length));
 
-	mGwTimeout = TimerMilli::GetNow() + mConfig.GetGatewayTimeout() * 1000;
-
 exit:
 	return error;
 }
 
 void MqttsnClient::SetDisconnected() {
 	mDisconnectRequested = false;
+	mSleepRequested = false;
 	mGwTimeout = 0;
 	mPingReqTime = 0;
 }

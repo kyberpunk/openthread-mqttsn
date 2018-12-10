@@ -32,6 +32,7 @@ enum Qos {
 enum DisconnectType {
 	MQTTSN_DISCONNECT_SERVER,
 	MQTTSN_DISCONNECT_CLIENT,
+	MQTTSN_DISCONNECT_ASLEEP,
 	MQTTSN_DISCONNECT_TIMEOUT
 };
 
@@ -197,6 +198,7 @@ private:
 	uint32_t mPingReqTime;
 	uint32_t mGwTimeout;
 	bool mDisconnectRequested;
+	bool mSleepRequested;
 	ClientState mClientState;
 	ConnectCallbackFunc mConnectCallback;
 	void* mConnectContext;

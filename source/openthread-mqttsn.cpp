@@ -12,7 +12,6 @@
 #include "fsl_debug_console.h"
 
 // TODO: Implement log output with OT platform implementation
-// TODO: Implement connect retry
 
 #include "mqttsn_client.hpp"
 
