@@ -286,12 +286,15 @@ otError MqttsnClient::Stop() {
 }
 
 otError MqttsnClient::Process() {
+	otError error = OT_ERROR_NONE;
+
 	// Process ping
 	if (mIsConnected && mPingReqTime != 0 && mPingReqTime <= TimerMilli::GetNow()) {
-		PingGateway();
+		SuccessOrExit(error = PingGateway());
 	}
 
-	return OT_ERROR_NONE;
+exit:
+	return error;
 }
 
 otError MqttsnClient::Connect(MqttsnConfig &config) {

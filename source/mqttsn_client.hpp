@@ -88,7 +88,6 @@ private:
 	std::string mClientId;
 	uint16_t mKeepAlive;
 	bool mCleanSession;
-
 };
 
 class MqttsnClient : public InstanceLocator

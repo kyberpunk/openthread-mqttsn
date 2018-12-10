@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
     	instance.GetTaskletScheduler().ProcessQueuedTasklets();
     	otSysProcessDrivers(&instance);
     	ProcessWorker(instance);
-    	client->Process();
+    	SuccessOrExit(error = client->Process());
     }
     return 0;
 
