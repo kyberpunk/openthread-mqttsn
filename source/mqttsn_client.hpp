@@ -15,213 +15,233 @@ namespace ot {
 
 namespace Mqttsn {
 
-enum ReturnCode {
-	MQTTSN_CODE_ACCEPTED = 0,
-	MQTTSN_CODE_REJECTED_CONGESTION = 1,
-	MQTTSN_CODE_REJECTED_TOPIC_ID = 2,
-	MQTTSN_CODE_REJECTED_NOT_SUPPORTED = 3
+enum ReturnCode
+{
+    MQTTSN_CODE_ACCEPTED = 0,
+    MQTTSN_CODE_REJECTED_CONGESTION = 1,
+    MQTTSN_CODE_REJECTED_TOPIC_ID = 2,
+    MQTTSN_CODE_REJECTED_NOT_SUPPORTED = 3
 };
 
-enum Qos {
-	MQTTSN_QOS0 = 0x0,
-	MQTTSN_QOS1 = 0x1,
-	MQTTSN_QOS2 = 0x2,
-	MQTTSN_QOSm1 = 0x3
+enum Qos
+{
+    MQTTSN_QOS0 = 0x0,
+    MQTTSN_QOS1 = 0x1,
+    MQTTSN_QOS2 = 0x2,
+    MQTTSN_QOSm1 = 0x3
 };
 
-enum DisconnectType {
-	MQTTSN_DISCONNECT_SERVER,
-	MQTTSN_DISCONNECT_CLIENT,
-	MQTTSN_DISCONNECT_ASLEEP,
-	MQTTSN_DISCONNECT_TIMEOUT
+enum DisconnectType
+{
+    MQTTSN_DISCONNECT_SERVER,
+    MQTTSN_DISCONNECT_CLIENT,
+    MQTTSN_DISCONNECT_ASLEEP,
+    MQTTSN_DISCONNECT_TIMEOUT
 };
 
-enum ClientState {
-	MQTTSN_STATE_DISCONNECTED,
-	MQTTSN_STATE_ACTIVE,
-	MQTTSN_STATE_ASLEEP,
-	MQTTSN_STATE_AWAKE,
-	MQTTSN_STATE_LOST,
+enum ClientState
+{
+    MQTTSN_STATE_DISCONNECTED,
+    MQTTSN_STATE_ACTIVE,
+    MQTTSN_STATE_ASLEEP,
+    MQTTSN_STATE_AWAKE,
+    MQTTSN_STATE_LOST,
 };
 
 typedef uint16_t TopicId;
 
-class MqttsnConfig {
-public:
-	MqttsnConfig(void)
-		: mAddress()
-		, mPort()
-		, mClientId()
-		, mKeepAlive(30)
-		, mCleanSession()
-		, mGatewayTimeout(10) {
-		;
-	}
-
-	const Ip6::Address &GetAddress() {
-		return mAddress;
-	}
-
-	void SetAddress(const Ip6::Address &address) {
-		mAddress = address;
-	}
-
-	uint16_t GetPort() {
-		return mPort;
-	}
-
-	void SetPort(uint16_t port) {
-		mPort = port;
-	}
-
-	const std::string &GetClientId() {
-		return mClientId;
-	}
-
-	void SetClientId(const std::string &clientId) {
-		mClientId = clientId;
-	}
-
-	int16_t GetKeepAlive() {
-		return mKeepAlive;
-	}
-
-	void SetKeepAlive(int16_t duration) {
-		mKeepAlive = duration;
-	}
-
-	bool GetCleanSession() {
-		return mCleanSession;
-	}
-
-	void SetCleanSession(bool cleanSession) {
-		mCleanSession = cleanSession;
-	}
-
-	uint32_t GetGatewayTimeout() {
-		return mGatewayTimeout;
-	}
-
-	void SetGatewayTimeout(uint32_t timeout) {
-		mGatewayTimeout = timeout;
-	}
-
-private:
-	Ip6::Address mAddress;
-	uint16_t mPort;
-	std::string mClientId;
-	uint16_t mKeepAlive;
-	bool mCleanSession;
-	uint32_t mGatewayTimeout;
-};
-
-class MqttsnClient : public InstanceLocator
+class MqttsnConfig
 {
 public:
-	typedef void (*ConnectCallbackFunc)(ReturnCode code, void* context);
+    MqttsnConfig(void)
+        : mAddress()
+        , mPort()
+        , mClientId()
+        , mKeepAlive(30)
+        , mCleanSession()
+        , mGatewayTimeout(10)
+    {
+        ;
+    }
 
-	typedef void (*SubscribeCallbackFunc)(ReturnCode code, TopicId topicId, void* context);
+    const Ip6::Address &GetAddress()
+    {
+        return mAddress;
+    }
 
-	typedef void (*PublishReceivedCallbackFunc)(const uint8_t* payload, int32_t payloadLength, Qos qos, TopicId topicId, void* context);
+    void SetAddress(const Ip6::Address &aAddress)
+    {
+        mAddress = aAddress;
+    }
 
-	typedef void (*AdvertiseCallbackFunc)(const Ip6::Address &address, uint16_t port, uint8_t gatewayId, uint32_t duration, void* context);
+    uint16_t GetPort()
+    {
+        return mPort;
+    }
 
-	typedef void (*SearchGwCallbackFunc)(const Ip6::Address &address, uint16_t port, uint8_t gatewayId, void* context);
+    void SetPort(uint16_t aPort)
+    {
+        mPort = aPort;
+    }
 
-	typedef void (*RegisterCallbackFunc)(ReturnCode code, TopicId topicId, void* context);
+    const std::string &GetClientId()
+    {
+        return mClientId;
+    }
 
-	typedef void (*PublishedCallbackFunc)(ReturnCode code, TopicId topicId, void* context);
+    void SetClientId(const std::string &aClientId)
+    {
+        mClientId = aClientId;
+    }
 
-	typedef void (*UnsubscribedCallbackFunc)(void* context);
+    int16_t GetKeepAlive()
+    {
+        return mKeepAlive;
+    }
 
-	typedef void (*DisconnectedCallbackFunc)(DisconnectType type, void* context);
+    void SetKeepAlive(int16_t aDuration)
+    {
+        mKeepAlive = aDuration;
+    }
 
-	MqttsnClient(Instance &aInstance);
+    bool GetCleanSession()
+    {
+        return mCleanSession;
+    }
 
-	otError Start(uint16_t port);
+    void SetCleanSession(bool aCleanSession)
+    {
+        mCleanSession = aCleanSession;
+    }
 
-	otError Stop(void);
+    uint32_t GetGatewayTimeout()
+    {
+        return mGatewayTimeout;
+    }
 
-	otError Process(void);
-
-	otError Connect(MqttsnConfig &config);
-
-	// TODO: Overload for other topic types
-	otError Subscribe(const std::string &topic, Qos qos);
-
-	otError Register(const std::string &topic);
-
-	otError Publish(const uint8_t* data, int32_t lenght, Qos qos, TopicId topicId);
-
-	otError Unsubscribe(TopicId topicId);
-
-	otError Disconnect(void);
-
-	otError Sleep(uint16_t duration);
-
-	otError Awake(uint32_t timeout);
-
-	otError SearchGateway(const Ip6::Address &multicast_address, uint16_t port, uint8_t radius);
-
-	ClientState GetState(ClientState state);
-
-	otError SetConnectedCallback(ConnectCallbackFunc callback, void* context);
-
-	otError SetSubscribeCallback(SubscribeCallbackFunc callback, void* context);
-
-	otError SetPublishReceivedCallback(PublishReceivedCallbackFunc callback, void* context);
-
-	otError SetAdvertiseCallback(AdvertiseCallbackFunc callback, void* context);
-
-	otError SetSearchGwCallback(SearchGwCallbackFunc callback, void* context);
-
-	otError SetRegisterCallback(RegisterCallbackFunc callback, void* context);
-
-	otError SetPublishedCallback(PublishedCallbackFunc callback, void* context);
-
-	otError SetUnsubscribedCallback(UnsubscribedCallbackFunc callback, void* context);
-
-	otError SetDisconnectedCallback(DisconnectedCallbackFunc callback, void* context);
+    void SetGatewayTimeout(uint32_t aTimeout)
+    {
+        mGatewayTimeout = aTimeout;
+    }
 
 private:
-	static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
+    Ip6::Address mAddress;
+    uint16_t mPort;
+    std::string mClientId;
+    uint16_t mKeepAlive;
+    bool mCleanSession;
+    uint32_t mGatewayTimeout;
+};
 
-	otError SendMessage(unsigned char* buffer, int32_t length);
+class MqttsnClient: public InstanceLocator
+{
+public:
+    typedef void (*ConnectCallbackFunc)(ReturnCode aCode, void* aContext);
 
-	otError SendMessage(unsigned char* buffer, int32_t length, const Ip6::Address &address, uint16_t port, uint8_t hopLimit = 0);
+    typedef void (*SubscribeCallbackFunc)(ReturnCode aCode, TopicId topicId, void* aContext);
 
-	otError PingGateway(void);
+    typedef void (*PublishReceivedCallbackFunc)(const uint8_t* aPayload, int32_t aPayloadLength, Qos aQos, TopicId aTopicId, void* aContext);
 
-	void OnDisconnected(void);
+    typedef void (*AdvertiseCallbackFunc)(const Ip6::Address &aAddress, uint16_t aPort, uint8_t aGatewayId, uint32_t aDuration, void* aContext);
 
-	bool VerifyGatewayAddress(const Ip6::MessageInfo &messageInfo);
+    typedef void (*SearchGwCallbackFunc)(const Ip6::Address &aAddress, uint16_t aPort, uint8_t aGatewayId, void* aContext);
 
-	Ip6::UdpSocket mSocket;
-	MqttsnConfig mConfig;
-	uint16_t mPacketId;
-	uint32_t mPingReqTime;
-	uint32_t mGwTimeout;
-	bool mDisconnectRequested;
-	bool mSleepRequested;
-	ClientState mClientState;
-	ConnectCallbackFunc mConnectCallback;
-	void* mConnectContext;
-	SubscribeCallbackFunc mSubscribeCallback;
-	void* mSubscribeContext;
-	PublishReceivedCallbackFunc mPublishReceivedCallback;
-	void* mPublishReceivedContext;
-	AdvertiseCallbackFunc mAdvertiseCallback;
-	void* mAdvertiseContext;
-	SearchGwCallbackFunc mSearchGwCallback;
-	void* mSearchGwContext;
-	RegisterCallbackFunc mRegisterCallback;
-	void* mRegisterContext;
-	PublishedCallbackFunc mPublishedCallback;
-	void* mPublishedContext;
-	UnsubscribedCallbackFunc mUnsubscribedCallback;
-	void* mUnsubscribedContext;
-	DisconnectedCallbackFunc mDisconnectedCallback;
-	void* mDisconnectedContext;
+    typedef void (*RegisterCallbackFunc)(ReturnCode aCode, TopicId aTopicId, void* aContext);
+
+    typedef void (*PublishedCallbackFunc)(ReturnCode aCode, TopicId aTopicId, void* aContext);
+
+    typedef void (*UnsubscribedCallbackFunc)(void* aContext);
+
+    typedef void (*DisconnectedCallbackFunc)(DisconnectType aType, void* aContext);
+
+    MqttsnClient(Instance &aInstance);
+
+    otError Start(uint16_t aPort);
+
+    otError Stop(void);
+
+    otError Process(void);
+
+    otError Connect(MqttsnConfig &aConfig);
+
+    // TODO: Overload for other topic types
+    otError Subscribe(const std::string &aTopic, Qos aQos);
+
+    otError Register(const std::string &aTopic);
+
+    otError Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, TopicId aTopicId);
+
+    otError Unsubscribe(TopicId aTopicId);
+
+    otError Disconnect(void);
+
+    otError Sleep(uint16_t aDuration);
+
+    otError Awake(uint32_t aTimeout);
+
+    otError SearchGateway(const Ip6::Address &aMulticastAddress, uint16_t aPort, uint8_t aRadius);
+
+    ClientState GetState(ClientState aState);
+
+    otError SetConnectedCallback(ConnectCallbackFunc aCallback, void* aContext);
+
+    otError SetSubscribeCallback(SubscribeCallbackFunc aCallback, void* aContext);
+
+    otError SetPublishReceivedCallback(PublishReceivedCallbackFunc aCallback, void* aContext);
+
+    otError SetAdvertiseCallback(AdvertiseCallbackFunc aCallback, void* aContext);
+
+    otError SetSearchGwCallback(SearchGwCallbackFunc aCallback, void* aContext);
+
+    otError SetRegisterCallback(RegisterCallbackFunc aCallback, void* aContext);
+
+    otError SetPublishedCallback(PublishedCallbackFunc aCallback, void* aContext);
+
+    otError SetUnsubscribedCallback(UnsubscribedCallbackFunc aCallback, void* aContext);
+
+    otError SetDisconnectedCallback(DisconnectedCallbackFunc aCallback, void* aContext);
+
+private:
+    static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
+
+    otError SendMessage(unsigned char* aBuffer, int32_t aLength);
+
+    otError SendMessage(unsigned char* aBuffer, int32_t aLength, const Ip6::Address &aAddress, uint16_t aPort);
+
+    otError SendMessage(unsigned char* aBuffer, int32_t aLength, const Ip6::Address &aAddress, uint16_t aPort, uint8_t aHopLimit);
+
+    otError PingGateway(void);
+
+    void OnDisconnected(void);
+
+    bool VerifyGatewayAddress(const Ip6::MessageInfo &aMessageInfo);
+
+    Ip6::UdpSocket mSocket;
+    MqttsnConfig mConfig;
+    uint16_t mPacketId;
+    uint32_t mPingReqTime;
+    uint32_t mGwTimeout;
+    bool mDisconnectRequested;
+    bool mSleepRequested;
+    ClientState mClientState;
+    ConnectCallbackFunc mConnectCallback;
+    void* mConnectContext;
+    SubscribeCallbackFunc mSubscribeCallback;
+    void* mSubscribeContext;
+    PublishReceivedCallbackFunc mPublishReceivedCallback;
+    void* mPublishReceivedContext;
+    AdvertiseCallbackFunc mAdvertiseCallback;
+    void* mAdvertiseContext;
+    SearchGwCallbackFunc mSearchGwCallback;
+    void* mSearchGwContext;
+    RegisterCallbackFunc mRegisterCallback;
+    void* mRegisterContext;
+    PublishedCallbackFunc mPublishedCallback;
+    void* mPublishedContext;
+    UnsubscribedCallbackFunc mUnsubscribedCallback;
+    void* mUnsubscribedContext;
+    DisconnectedCallbackFunc mDisconnectedCallback;
+    void* mDisconnectedContext;
 };
 
 }

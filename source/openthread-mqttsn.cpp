@@ -34,186 +34,218 @@
 #define CLIENT_ID "THREAD"
 #define CLIENT_PORT 11111
 
-enum ApplicationState {
-	STATE_STARTED,
-	STATE_INITIALIZED,
-	STATE_THREAD_STARTING,
-	STATE_THREAD_STARTED,
-	STATE_MQTT_SEARCHGW,
-	STATE_MQTT_CONNECTING,
-	STATE_MQTT_CONNECTED,
-	STATE_MQTT_RUNNING
+enum ApplicationState
+{
+    STATE_STARTED,
+    STATE_INITIALIZED,
+    STATE_THREAD_STARTING,
+    STATE_THREAD_STARTED,
+    STATE_MQTT_SEARCHGW,
+    STATE_MQTT_CONNECTING,
+    STATE_MQTT_CONNECTED,
+    STATE_MQTT_RUNNING
 };
 
-static ApplicationState state = STATE_STARTED;
-static ot::Mqttsn::MqttsnClient* client = nullptr;
-static uint32_t connectionTimeoutTime = 0;
-static otNetifAddress slaacAddresses[OPENTHREAD_CONFIG_NUM_SLAAC_ADDRESSES];
+static ApplicationState sState = STATE_STARTED;
+static ot::Mqttsn::MqttsnClient* sClient = nullptr;
+static uint32_t sConnectionTimeoutTime = 0;
+static otNetifAddress sSlaacAddresses[OPENTHREAD_CONFIG_NUM_SLAAC_ADDRESSES];
 #if GATEWAY_SEARCH
-static ot::Ip6::Address gatewayAddress;
-static uint16_t gatewayPort;
-static uint32_t searchGwTimeoutTime = 0;
+static ot::Ip6::Address sGatewayAddress;
+static uint16_t sGatewayPort;
+static uint32_t sSearchGwTimeoutTime = 0;
 #endif
 
-static void MqttsnConnectedCallback(ot::Mqttsn::ReturnCode code, void* context) {
-	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
-		PRINTF("Successfully connected.\r\n");
-		state = STATE_MQTT_CONNECTED;
-	} else {
-		PRINTF("Connection failed with code: %d.\r\n", code);
-		state = STATE_THREAD_STARTED;
-	}
+static void MqttsnConnectedCallback(ot::Mqttsn::ReturnCode aCode, void* aContext)
+{
+    if (aCode == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED)
+    {
+        PRINTF("Successfully connected.\r\n");
+        sState = STATE_MQTT_CONNECTED;
+    }
+    else
+    {
+        PRINTF("Connection failed with code: %d.\r\n", aCode);
+        sState = STATE_THREAD_STARTED;
+    }
 }
 
-static void MqttsnDisconnectedCallback(ot::Mqttsn::DisconnectType type, void* context) {
-	PRINTF("Client disconnected. Reason: %d.\r\n", type);
-	state = STATE_THREAD_STARTED;
+static void MqttsnDisconnectedCallback(ot::Mqttsn::DisconnectType aType, void* aContext)
+{
+    PRINTF("Client disconnected. Reason: %d.\r\n", aType);
+    sState = STATE_THREAD_STARTED;
 }
 
-static void MqttsnReceived(const uint8_t* payload, int32_t payloadLength, ot::Mqttsn::Qos qos, ot::Mqttsn::TopicId topicId, void* context) {
-	PRINTF("Message received from topic %d with QoS %d:\r\n", topicId, qos);
-	for (int i = 0; i < payloadLength; i++) {
-		PRINTF("%c", static_cast<int8_t>(payload[i]));
-	}
-	PRINTF("\r\n");
+static void MqttsnReceived(const uint8_t* aPayload, int32_t aPayloadLength, ot::Mqttsn::Qos aQos, ot::Mqttsn::TopicId topicId, void* aContext)
+{
+    PRINTF("Message received from topic %d with QoS %d:\r\n", topicId, aQos);
+    for (int i = 0; i < aPayloadLength; i++)
+    {
+        PRINTF("%c", static_cast<int8_t>(aPayload[i]));
+    }
+    PRINTF("\r\n");
 }
 
-static void MqttsnConnect(const ot::Ip6::Address &address, uint16_t port) {
-	auto config = ot::Mqttsn::MqttsnConfig();
-	config.SetClientId(CLIENT_ID);
-	config.SetKeepAlive(30);
-	config.SetCleanSession(true);
-	config.SetPort(port);
-	config.SetAddress(address);
-	client->SetConnectedCallback(MqttsnConnectedCallback, nullptr);
-	client->SetDisconnectedCallback(MqttsnDisconnectedCallback, nullptr);
-	client->SetPublishReceivedCallback(MqttsnReceived, nullptr);
+static void MqttsnConnect(const ot::Ip6::Address &aAddress, uint16_t aPort)
+{
+    auto config = ot::Mqttsn::MqttsnConfig();
+    config.SetClientId(CLIENT_ID);
+    config.SetKeepAlive(30);
+    config.SetCleanSession(true);
+    config.SetPort(aPort);
+    config.SetAddress(aAddress);
+    sClient->SetConnectedCallback(MqttsnConnectedCallback, nullptr);
+    sClient->SetDisconnectedCallback(MqttsnDisconnectedCallback, nullptr);
+    sClient->SetPublishReceivedCallback(MqttsnReceived, nullptr);
 
-	otError error = OT_ERROR_NONE;
-	if ((error = client->Connect(config)) == OT_ERROR_NONE) {
-		PRINTF("Connecting to MQTTSN broker.\r\n");
-	} else {
-		PRINTF("Connection failed with error: %d.\r\n", error);
-	}
+    otError error = OT_ERROR_NONE;
+    if ((error = sClient->Connect(config)) == OT_ERROR_NONE)
+    {
+        PRINTF("Connecting to MQTTSN broker.\r\n");
+    }
+    else
+    {
+        PRINTF("Connection failed with error: %d.\r\n", error);
+    }
 }
 
-static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode code, ot::Mqttsn::TopicId topicId ,void* context) {
-	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
-		PRINTF("Successfully subscribed to topic: %d.\r\n", topicId);
-		state = STATE_MQTT_RUNNING;
+static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::TopicId aTopicId, void* aContext)
+{
+    if (aCode == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED)
+    {
+        PRINTF("Successfully subscribed to topic: %d.\r\n", aTopicId);
+        sState = STATE_MQTT_RUNNING;
 
-		std::string data = "hello";
-		client->Publish(reinterpret_cast<const uint8_t *>(data.c_str()), data.length(), ot::Mqttsn::Qos::MQTTSN_QOS0, topicId);
-	} else {
-		PRINTF("Subscription failed with code: %d.\r\n", code);
-		state = STATE_MQTT_CONNECTED;
-	}
+        std::string data = "hello";
+        sClient->Publish(reinterpret_cast<const uint8_t *>(data.c_str()), data.length(), ot::Mqttsn::Qos::MQTTSN_QOS0, aTopicId);
+    }
+    else
+    {
+        PRINTF("Subscription failed with code: %d.\r\n", aCode);
+        sState = STATE_MQTT_CONNECTED;
+    }
 }
 
-static void MqttsnSubscribe() {
-	client->SetSubscribeCallback(MqttsnSubscribeCallback, nullptr);
-	client->Subscribe(DEFAULT_TOPIC, ot::Mqttsn::Qos::MQTTSN_QOS0);
-	PRINTF("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
+static void MqttsnSubscribe()
+{
+    sClient->SetSubscribeCallback(MqttsnSubscribeCallback, nullptr);
+    sClient->Subscribe(DEFAULT_TOPIC, ot::Mqttsn::Qos::MQTTSN_QOS0);
+    PRINTF("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
 }
 
 #if GATEWAY_SEARCH
-static void SearchGatewayCallback(const ot::Ip6::Address &address, uint16_t port, uint8_t gatewayId, void* context) {
-	PRINTF("SearchGw found gateway with id: %u, %s:%u\r\n", gatewayId, address.ToString().AsCString(), port);
-	gatewayAddress = address;
-	gatewayPort = port;
-	MqttsnConnect(gatewayAddress, gatewayPort);
-	state = STATE_MQTT_CONNECTING;
+static void SearchGatewayCallback(const ot::Ip6::Address &aAddress, uint16_t aPort, uint8_t aGatewayId, void* aContext)
+{
+    PRINTF("SearchGw found gateway with id: %u, %s:%u\r\n", aGatewayId, aAddress.ToString().AsCString(), aPort);
+    sGatewayAddress = aAddress;
+    sGatewayPort = aPort;
+    MqttsnConnect(sGatewayAddress, sGatewayPort);
+    sState = STATE_MQTT_CONNECTING;
 }
 
-static void AdvertiseCallback(const ot::Ip6::Address &address, uint16_t port, uint8_t gatewayId, uint32_t duration, void* context) {
-	PRINTF("Received gateway advertise with id: %u, %s:%u\r\n", gatewayId, address.ToString().AsCString(), port);
-	gatewayAddress = address;
-	gatewayPort = port;
-	MqttsnConnect(gatewayAddress, gatewayPort);
-	state = STATE_MQTT_CONNECTING;
+static void AdvertiseCallback(const ot::Ip6::Address &aAddress, uint16_t aPort, uint8_t aGatewayId, uint32_t aDuration, void* aContext)
+{
+    PRINTF("Received gateway advertise with id: %u, %s:%u\r\n", aGatewayId, aAddress.ToString().AsCString(), aPort);
+    sGatewayAddress = aAddress;
+    sGatewayPort = aPort;
+    MqttsnConnect(sGatewayAddress, sGatewayPort);
+    sState = STATE_MQTT_CONNECTING;
 }
 
-static void SearchGateway(const std::string &multicast_address, uint16_t port) {
-	otError error = OT_ERROR_NONE;
-	ot::Ip6::Address address;
-	address.FromString(multicast_address.c_str());
-	if ((error = client->SearchGateway(address, port, GATEWAY_MULTICAST_RADIUS)) == OT_ERROR_NONE) {
-		searchGwTimeoutTime = ot::TimerMilli::GetNow() + SEND_TIMEOUT;
-		PRINTF("Searching gateway.\r\n");
-	} else {
-		PRINTF("Search gateway failed with error: %d.\r\n", error);
-	}
-	state = STATE_MQTT_SEARCHGW;
+static void SearchGateway(const std::string &aMulticastAddress, uint16_t aPort)
+{
+    otError error = OT_ERROR_NONE;
+    ot::Ip6::Address address;
+    address.FromString(aMulticastAddress.c_str());
+    if ((error = sClient->SearchGateway(address, aPort, GATEWAY_MULTICAST_RADIUS)) == OT_ERROR_NONE)
+    {
+        sSearchGwTimeoutTime = ot::TimerMilli::GetNow() + SEND_TIMEOUT;
+        PRINTF("Searching gateway.\r\n");
+    }
+    else
+    {
+        PRINTF("Search gateway failed with error: %d.\r\n", error);
+    }
+    sState = STATE_MQTT_SEARCHGW;
 }
 #endif
 
-static void ProcessWorker(ot::Instance &instance) {
-	otDeviceRole role;
-	switch (state) {
-	case STATE_THREAD_STARTING:
-		role = instance.GetThreadNetif().GetMle().GetRole();
-		if (role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_LEADER || role == OT_DEVICE_ROLE_ROUTER) {
-			PRINTF("Thread started. Role: %d.\r\n", role);
-			state = STATE_THREAD_STARTED;
-		}
-		break;
-	case STATE_THREAD_STARTED:
-#if GATEWAY_SEARCH
-		SearchGateway(GATEWAY_MULTICAST_ADDRESS, GATEWAY_MULTICAST_PORT);
+static void ProcessWorker(ot::Instance &aInstance)
+{
+    otDeviceRole role;
+    switch (sState)
+    {
+    case STATE_THREAD_STARTING:
+        role = aInstance.GetThreadNetif().GetMle().GetRole();
+        if (role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_LEADER || role == OT_DEVICE_ROLE_ROUTER)
+        {
+            PRINTF("Thread started. Role: %d.\r\n", role);
+            sState = STATE_THREAD_STARTED;
+        }
+        break;
+    case STATE_THREAD_STARTED:
+        #if GATEWAY_SEARCH
+        SearchGateway(GATEWAY_MULTICAST_ADDRESS, GATEWAY_MULTICAST_PORT);
 #else
-		ot::Ip6::Address address;
-		address.FromString(GATEWAY_ADDRESS);
-		MqttsnConnect(address, GATEWAY_PORT);
-		connectionTimeoutTime = ot::TimerMilli::GetNow() + SEND_TIMEOUT;
-		state = STATE_MQTT_CONNECTING;
+        ot::Ip6::Address address;
+        address.FromString(GATEWAY_ADDRESS);
+        MqttsnConnect(address, GATEWAY_PORT);
+        sConnectionTimeoutTime = ot::TimerMilli::GetNow() + SEND_TIMEOUT;
+        sState = STATE_MQTT_CONNECTING;
 #endif
-		break;
+        break;
 #if GATEWAY_SEARCH
-	case STATE_MQTT_SEARCHGW:
-		if (connectionTimeoutTime != 0 && connectionTimeoutTime < ot::TimerMilli::GetNow()) {
-			role = instance.GetThreadNetif().GetMle().GetRole();
-			PRINTF("Connection timeout. Role: %d\r\n", role);
-			state = STATE_THREAD_STARTED;
-		}
-		break;
+    case STATE_MQTT_SEARCHGW:
+        if (sConnectionTimeoutTime != 0 && sConnectionTimeoutTime < ot::TimerMilli::GetNow())
+        {
+            role = aInstance.GetThreadNetif().GetMle().GetRole();
+            PRINTF("Connection timeout. Role: %d\r\n", role);
+            sState = STATE_THREAD_STARTED;
+        }
+        break;
 #endif
-	case STATE_MQTT_CONNECTING:
-		if (connectionTimeoutTime != 0 && connectionTimeoutTime < ot::TimerMilli::GetNow()) {
-			role = instance.GetThreadNetif().GetMle().GetRole();
-			PRINTF("Connection timeout. Role: %d\r\n", role);
-			state = STATE_THREAD_STARTED;
-		}
-		break;
-	case STATE_MQTT_CONNECTED:
-		MqttsnSubscribe();
-		state = STATE_MQTT_RUNNING;
-		break;
-	default:
-		break;
-	}
+    case STATE_MQTT_CONNECTING:
+        if (sConnectionTimeoutTime != 0 && sConnectionTimeoutTime < ot::TimerMilli::GetNow())
+        {
+            role = aInstance.GetThreadNetif().GetMle().GetRole();
+            PRINTF("Connection timeout. Role: %d\r\n", role);
+            sState = STATE_THREAD_STARTED;
+        }
+        break;
+    case STATE_MQTT_CONNECTED:
+        MqttsnSubscribe();
+        sState = STATE_MQTT_RUNNING;
+        break;
+    default:
+        break;
+    }
 }
 
-void HandleNetifStateChanged(otChangedFlags aFlags, void *aContext) {
-	ot::Instance &instance = *static_cast<ot::Instance *>(aContext);
-	VerifyOrExit((aFlags & OT_CHANGED_THREAD_NETDATA) != 0);
+void HandleNetifStateChanged(otChangedFlags aFlags, void *aContext)
+{
+    ot::Instance &instance = *static_cast<ot::Instance *>(aContext);
+    VerifyOrExit((aFlags & OT_CHANGED_THREAD_NETDATA) != 0);
 
-	ot::Utils::Slaac::UpdateAddresses(&instance, slaacAddresses, sizeof(slaacAddresses), ot::Utils::Slaac::CreateRandomIid, nullptr);
+    ot::Utils::Slaac::UpdateAddresses(&instance, sSlaacAddresses, sizeof(sSlaacAddresses), ot::Utils::Slaac::CreateRandomIid, nullptr);
 
 exit:
-	return;
+    return;
 }
 
-int main(int argc, char *argv[]) {
-	otError error = OT_ERROR_NONE;
-	uint16_t acquisitionId = 0;
+int main(int aArgc, char *aArgv[])
+{
+    otError error = OT_ERROR_NONE;
+    uint16_t acquisitionId = 0;
 
-	memset(slaacAddresses, 0, sizeof(slaacAddresses));
-	otSysInit(argc, argv);
-	BOARD_InitDebugConsole();
+    memset(sSlaacAddresses, 0, sizeof(sSlaacAddresses));
+    otSysInit(aArgc, aArgv);
+    BOARD_InitDebugConsole();
 
-	ot::Instance &instance = ot::Instance::InitSingle();
-	instance.GetNotifier().RegisterCallback(HandleNetifStateChanged, &instance);
-    state = STATE_INITIALIZED;
+    ot::Instance &instance = ot::Instance::InitSingle();
+    ot::Mqttsn::MqttsnClient client = ot::Mqttsn::MqttsnClient(instance);
+    sClient = &client;
+    instance.GetNotifier().RegisterCallback(HandleNetifStateChanged, &instance);
+    sState = STATE_INITIALIZED;
 
     // Set default network settings
     ot::ThreadNetif &netif = instance.GetThreadNetif();
@@ -229,26 +261,26 @@ int main(int argc, char *argv[]) {
     SuccessOrExit(error = netif.Up());
     SuccessOrExit(error = netif.GetMle().Start(true, false));
 
-    client = new ot::Mqttsn::MqttsnClient(instance);
-    SuccessOrExit(error = client->Start(CLIENT_PORT));
+    SuccessOrExit(error = sClient->Start(CLIENT_PORT));
 #if GATEWAY_SEARCH
-    SuccessOrExit(error = client->SetSearchGwCallback(SearchGatewayCallback, NULL));
-    SuccessOrExit(error = client->SetAdvertiseCallback(AdvertiseCallback, NULL));
+    SuccessOrExit(error = sClient->SetSearchGwCallback(SearchGatewayCallback, NULL));
+    SuccessOrExit(error = sClient->SetAdvertiseCallback(AdvertiseCallback, NULL));
 #endif
-    state = STATE_THREAD_STARTING;
+    sState = STATE_THREAD_STARTING;
     PRINTF("Thread starting.\r\n");
 
-    while (true) {
-    	instance.GetTaskletScheduler().ProcessQueuedTasklets();
-    	otSysProcessDrivers(&instance);
-    	ProcessWorker(instance);
-    	SuccessOrExit(error = client->Process());
+    while (true)
+    {
+        instance.GetTaskletScheduler().ProcessQueuedTasklets();
+        otSysProcessDrivers(&instance);
+        ProcessWorker(instance);
+        SuccessOrExit(error = sClient->Process());
     }
     return 0;
 
 exit:
-	PRINTF("Initialization failed with error: %d\r\n", error);
-	return 1;
+    PRINTF("Initialization failed with error: %d\r\n", error);
+    return 1;
 }
 
 extern "C" void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
@@ -263,10 +295,12 @@ extern "C" void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const ch
     va_end(ap);
 }
 
-extern "C" void otPlatUartReceived(const uint8_t *aBuf, uint16_t aBufLength) {
+extern "C" void otPlatUartReceived(const uint8_t *aBuf, uint16_t aBufLength)
+{
     ;
 }
 
-extern "C" void otPlatUartSendDone(void) {
+extern "C" void otPlatUartSendDone(void)
+{
     ;
 }
