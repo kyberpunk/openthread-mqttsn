@@ -181,13 +181,13 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 			break;
 		}
 		if (client->mSearchGwCallback) {
-			Ip6::Address address;
 			if (addressLength > 0) {
-				address.FromString(std::string(reinterpret_cast<char *>(addressText), static_cast<size_t>(addressLength)).c_str());
-			} else {
-				address = messageInfo.GetPeerAddr();
+				// client response not supported
+				break;
 			}
-			client->mSearchGwCallback(address, gatewayId, client->mSearchGwContext);
+			Ip6::Address address = messageInfo.GetPeerAddr();
+			uint16_t port = messageInfo.GetPeerPort();
+			client->mSearchGwCallback(address, port, gatewayId, client->mSearchGwContext);
 		}
 	}
 		break;
@@ -586,6 +586,23 @@ exit:
 	return error;
 }
 
+otError MqttsnClient::SearchGateway(const Ip6::Address &multicast_address, uint16_t port, uint8_t radius) {
+	otError error = OT_ERROR_NONE;
+	int32_t length = -1;
+	unsigned char buffer[MAX_PACKET_SIZE];
+
+	length = MQTTSNSerialize_searchgw(buffer, MAX_PACKET_SIZE, radius);
+	if (length <= 0) {
+		error = OT_ERROR_FAILED;
+		goto exit;
+	}
+
+	SuccessOrExit(error = SendMessage(buffer, length, multicast_address, port, radius));
+
+exit:
+	return error;
+}
+
 ClientState MqttsnClient::GetState(ClientState state) {
 	return mClientState;
 }
@@ -648,7 +665,7 @@ otError MqttsnClient::SendMessage(unsigned char* buffer, int32_t length) {
 	return SendMessage(buffer, length, mConfig.GetAddress(), mConfig.GetPort());
 }
 
-otError MqttsnClient::SendMessage(unsigned char* buffer, int32_t length, const Ip6::Address &address, uint16_t port) {
+otError MqttsnClient::SendMessage(unsigned char* buffer, int32_t length, const Ip6::Address &address, uint16_t port, uint8_t hopLimit) {
 	otError error = OT_ERROR_NONE;
 	Ip6::MessageInfo messageInfo;
 	Message *message = nullptr;
@@ -657,6 +674,7 @@ otError MqttsnClient::SendMessage(unsigned char* buffer, int32_t length, const I
             error = OT_ERROR_NO_BUFS);
 	message->Append(buffer, length);
 
+	messageInfo.SetHopLimit(hopLimit);
 	messageInfo.SetPeerAddr(address);
 	messageInfo.SetPeerPort(port);
 	messageInfo.SetInterfaceId(OT_NETIF_INTERFACE_ID_THREAD);

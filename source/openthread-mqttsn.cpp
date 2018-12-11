@@ -5,7 +5,6 @@
 #include "openthread/platform/uart.h"
 #include "openthread/instance.h"
 #include "openthread-system.h"
-#include "openthread/platform/alarm-milli.h"
 #include "utils/slaac_address.hpp"
 
 #include "board.h"
@@ -22,10 +21,15 @@
 #define MASTER_KEY {0x33, 0x33, 0x44, 0x44, 0x33, 0x33, 0x44, 0x44, 0x33, 0x33, 0x44, 0x44, 0x33, 0x33, 0x44, 0x44}
 
 #define GATEWAY_PORT 10000
-//#define GATEWAY_ADDRESS "2018:ff9b::c0a8:2d"
 #define GATEWAY_ADDRESS "2018:ff9b::ac12:8"
+
+#define GATEWAY_SEARCH 0
+#define GATEWAY_MULTICAST_PORT 1883
+#define GATEWAY_MULTICAST_ADDRESS "2018:ff9b::e101:101"
+#define GATEWAY_MULTICAST_RADIUS 4
+
 #define DEFAULT_TOPIC "test"
-#define CONNECTION_TIMEOUT 3000
+#define SEND_TIMEOUT 3000
 
 #define CLIENT_ID "THREAD"
 #define CLIENT_PORT 11111
@@ -35,6 +39,7 @@ enum ApplicationState {
 	STATE_INITIALIZED,
 	STATE_THREAD_STARTING,
 	STATE_THREAD_STARTED,
+	STATE_MQTT_SEARCHGW,
 	STATE_MQTT_CONNECTING,
 	STATE_MQTT_CONNECTED,
 	STATE_MQTT_RUNNING
@@ -44,6 +49,11 @@ static ApplicationState state = STATE_STARTED;
 static ot::Mqttsn::MqttsnClient* client = nullptr;
 static uint32_t connectionTimeoutTime = 0;
 static otNetifAddress slaacAddresses[OPENTHREAD_CONFIG_NUM_SLAAC_ADDRESSES];
+#if GATEWAY_SEARCH
+static ot::Ip6::Address gatewayAddress;
+static uint16_t gatewayPort;
+static uint32_t searchGwTimeoutTime = 0;
+#endif
 
 static void MqttsnConnectedCallback(ot::Mqttsn::ReturnCode code, void* context) {
 	if (code == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED) {
@@ -68,14 +78,12 @@ static void MqttsnReceived(const uint8_t* payload, int32_t payloadLength, ot::Mq
 	PRINTF("\r\n");
 }
 
-static void MqttsnConnect(ot::Instance &instance) {
+static void MqttsnConnect(const ot::Ip6::Address &address, uint16_t port) {
 	auto config = ot::Mqttsn::MqttsnConfig();
 	config.SetClientId(CLIENT_ID);
 	config.SetKeepAlive(30);
 	config.SetCleanSession(true);
-	config.SetPort(GATEWAY_PORT);
-	auto address = ot::Ip6::Address();
-	address.FromString(GATEWAY_ADDRESS);
+	config.SetPort(port);
 	config.SetAddress(address);
 	client->SetConnectedCallback(MqttsnConnectedCallback, nullptr);
 	client->SetDisconnectedCallback(MqttsnDisconnectedCallback, nullptr);
@@ -108,6 +116,37 @@ static void MqttsnSubscribe() {
 	PRINTF("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
 }
 
+#if GATEWAY_SEARCH
+static void SearchGatewayCallback(const ot::Ip6::Address &address, uint16_t port, uint8_t gatewayId, void* context) {
+	PRINTF("SearchGw found gateway with id: %u, %s:%u\r\n", gatewayId, address.ToString().AsCString(), port);
+	gatewayAddress = address;
+	gatewayPort = port;
+	MqttsnConnect(gatewayAddress, gatewayPort);
+	state = STATE_MQTT_CONNECTING;
+}
+
+static void AdvertiseCallback(const ot::Ip6::Address &address, uint16_t port, uint8_t gatewayId, uint32_t duration, void* context) {
+	PRINTF("Received gateway advertise with id: %u, %s:%u\r\n", gatewayId, address.ToString().AsCString(), port);
+	gatewayAddress = address;
+	gatewayPort = port;
+	MqttsnConnect(gatewayAddress, gatewayPort);
+	state = STATE_MQTT_CONNECTING;
+}
+
+static void SearchGateway(const std::string &multicast_address, uint16_t port) {
+	otError error = OT_ERROR_NONE;
+	ot::Ip6::Address address;
+	address.FromString(multicast_address.c_str());
+	if ((error = client->SearchGateway(address, port, GATEWAY_MULTICAST_RADIUS)) == OT_ERROR_NONE) {
+		searchGwTimeoutTime = ot::TimerMilli::GetNow() + SEND_TIMEOUT;
+		PRINTF("Searching gateway.\r\n");
+	} else {
+		PRINTF("Search gateway failed with error: %d.\r\n", error);
+	}
+	state = STATE_MQTT_SEARCHGW;
+}
+#endif
+
 static void ProcessWorker(ot::Instance &instance) {
 	otDeviceRole role;
 	switch (state) {
@@ -119,19 +158,29 @@ static void ProcessWorker(ot::Instance &instance) {
 		}
 		break;
 	case STATE_THREAD_STARTED:
-		MqttsnConnect(instance);
-		connectionTimeoutTime = otPlatAlarmMilliGetNow() + CONNECTION_TIMEOUT;
+#if GATEWAY_SEARCH
+		SearchGateway(GATEWAY_MULTICAST_ADDRESS, GATEWAY_MULTICAST_PORT);
+#else
+		ot::Ip6::Address address;
+		address.FromString(GATEWAY_ADDRESS);
+		MqttsnConnect(address, GATEWAY_PORT);
+		connectionTimeoutTime = ot::TimerMilli::GetNow() + SEND_TIMEOUT;
 		state = STATE_MQTT_CONNECTING;
+#endif
 		break;
-	case STATE_MQTT_CONNECTING:
-		if (connectionTimeoutTime < otPlatAlarmMilliGetNow()) {
+#if GATEWAY_SEARCH
+	case STATE_MQTT_SEARCHGW:
+		if (connectionTimeoutTime != 0 && connectionTimeoutTime < ot::TimerMilli::GetNow()) {
 			role = instance.GetThreadNetif().GetMle().GetRole();
 			PRINTF("Connection timeout. Role: %d\r\n", role);
-			auto address = instance.GetThreadNetif().GetUnicastAddresses();
-			while (address != nullptr) {
-				PRINTF("%s\r\n", address->GetAddress().ToString().AsCString());
-				address = address->GetNext();
-			}
+			state = STATE_THREAD_STARTED;
+		}
+		break;
+#endif
+	case STATE_MQTT_CONNECTING:
+		if (connectionTimeoutTime != 0 && connectionTimeoutTime < ot::TimerMilli::GetNow()) {
+			role = instance.GetThreadNetif().GetMle().GetRole();
+			PRINTF("Connection timeout. Role: %d\r\n", role);
 			state = STATE_THREAD_STARTED;
 		}
 		break;
@@ -182,6 +231,10 @@ int main(int argc, char *argv[]) {
 
     client = new ot::Mqttsn::MqttsnClient(instance);
     SuccessOrExit(error = client->Start(CLIENT_PORT));
+#if GATEWAY_SEARCH
+    SuccessOrExit(error = client->SetSearchGwCallback(SearchGatewayCallback, NULL));
+    SuccessOrExit(error = client->SetAdvertiseCallback(AdvertiseCallback, NULL));
+#endif
     state = STATE_THREAD_STARTING;
     PRINTF("Thread starting.\r\n");
 

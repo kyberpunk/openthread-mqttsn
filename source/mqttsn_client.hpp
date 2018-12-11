@@ -62,7 +62,7 @@ public:
 		return mAddress;
 	}
 
-	void SetAddress(Ip6::Address &address) {
+	void SetAddress(const Ip6::Address &address) {
 		mAddress = address;
 	}
 
@@ -126,7 +126,7 @@ public:
 
 	typedef void (*AdvertiseCallbackFunc)(const Ip6::Address &address, uint16_t port, uint8_t gatewayId, uint32_t duration, void* context);
 
-	typedef void (*SearchGwCallbackFunc)(const Ip6::Address &address, uint8_t gatewayId, void* context);
+	typedef void (*SearchGwCallbackFunc)(const Ip6::Address &address, uint16_t port, uint8_t gatewayId, void* context);
 
 	typedef void (*RegisterCallbackFunc)(ReturnCode code, TopicId topicId, void* context);
 
@@ -161,6 +161,8 @@ public:
 
 	otError Awake(uint32_t timeout);
 
+	otError SearchGateway(const Ip6::Address &multicast_address, uint16_t port, uint8_t radius);
+
 	ClientState GetState(ClientState state);
 
 	otError SetConnectedCallback(ConnectCallbackFunc callback, void* context);
@@ -186,7 +188,7 @@ private:
 
 	otError SendMessage(unsigned char* buffer, int32_t length);
 
-	otError SendMessage(unsigned char* buffer, int32_t length, const Ip6::Address &address, uint16_t port);
+	otError SendMessage(unsigned char* buffer, int32_t length, const Ip6::Address &address, uint16_t port, uint8_t hopLimit = 0);
 
 	otError PingGateway(void);
 
