@@ -1,5 +1,5 @@
-# OpenThread MQTT-SN Client Library
-This repository contains MQTT-SN client implementation based using OpenThread SDK. Protocol communicates over UDP in Thread mesh network. 
+# Thread MQTT-SN Client Library
+This repository contains MQTT-SN client implementation based on OpenThread SDK. Protocol communicates over UDP in Thread mesh network. 
 
 For development purposes and better interoperability the repository contains terporarily whole project created by [MCUXpresso IDE](https://www.nxp.com/support/developer-resources/software-development-tools/mcuxpresso-software-and-tools/mcuxpresso-integrated-development-environment-ide:MCUXpresso-IDE).
 
