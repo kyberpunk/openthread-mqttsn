@@ -190,7 +190,9 @@ private:
 
 	otError PingGateway(void);
 
-	void SetDisconnected(void);
+	void OnDisconnected(void);
+
+	bool VerifyGatewayAddress(const Ip6::MessageInfo &messageInfo);
 
 	Ip6::UdpSocket mSocket;
 	MqttsnConfig mConfig;

@@ -102,6 +102,9 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 	switch (decodedPacketType) {
 	case MQTTSN_CONNACK: {
 		int connectReturnCode = 0;
+		if (!client->VerifyGatewayAddress(messageInfo)) {
+			break;
+		}
 		if (MQTTSNDeserialize_connack(&connectReturnCode, data, length) != 1) {
 			break;
 		}
@@ -117,7 +120,9 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		if (client->mClientState != MQTTSN_STATE_ACTIVE) {
 			break;
 		}
-
+		if (!client->VerifyGatewayAddress(messageInfo)) {
+			break;
+		}
 		int qos;
 		unsigned short topicId = 0;
 		unsigned short packetId = 0;
@@ -136,7 +141,9 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		if (client->mClientState != MQTTSN_STATE_ACTIVE && client->mClientState != MQTTSN_STATE_AWAKE) {
 			break;
 		}
-
+		if (!client->VerifyGatewayAddress(messageInfo)) {
+			break;
+		}
 		int qos;
 		unsigned short packetId = 0;
 		int payloadLength = 0;
@@ -188,6 +195,9 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		if (client->mClientState != MQTTSN_STATE_ACTIVE) {
 			break;
 		}
+		if (!client->VerifyGatewayAddress(messageInfo)) {
+			break;
+		}
 
 		unsigned short topicId;
 		unsigned short packetId;
@@ -203,6 +213,9 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		break;
 	case MQTTSN_PUBACK: {
 		if (client->mClientState != MQTTSN_STATE_ACTIVE) {
+			break;
+		}
+		if (!client->VerifyGatewayAddress(messageInfo)) {
 			break;
 		}
 
@@ -222,6 +235,9 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		if (client->mClientState != MQTTSN_STATE_ACTIVE) {
 			break;
 		}
+		if (!client->VerifyGatewayAddress(messageInfo)) {
+			break;
+		}
 
 		unsigned short packetId;
 		if (MQTTSNDeserialize_unsuback(&packetId, data, length) != 1) {
@@ -237,6 +253,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		if (client->mClientState != MQTTSN_STATE_ACTIVE) {
 			break;
 		}
+
 		if (MQTTSNDeserialize_pingreq(&clientId, data, length) != 1) {
 			break;
 		}
@@ -256,6 +273,10 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		if (MQTTSNDeserialize_pingresp(data, length) != 1) {
 			break;
 		}
+		if (!client->VerifyGatewayAddress(messageInfo)) {
+			break;
+		}
+
 		client->mGwTimeout = 0;
 		if (client->mClientState == MQTTSN_STATE_AWAKE) {
 			client->mClientState = MQTTSN_STATE_ASLEEP;
@@ -271,7 +292,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		if (MQTTSNDeserialize_disconnect(&duration, data, length) != 1) {
 			break;
 		}
-		client->SetDisconnected();
+		client->OnDisconnected();
 
 		DisconnectType reason = MQTTSN_DISCONNECT_SERVER;
 		switch (client->mClientState) {
@@ -292,6 +313,10 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 		default:
 			break;
 		}
+		if (!client->VerifyGatewayAddress(messageInfo)) {
+			break;
+		}
+
 		if (client->mDisconnectedCallback) {
 			client->mDisconnectedCallback(reason, client->mDisconnectedContext);
 		}
@@ -321,7 +346,7 @@ otError MqttsnClient::Stop() {
 	return mSocket.Close();
 	if (mClientState != MQTTSN_STATE_DISCONNECTED && mClientState != MQTTSN_STATE_LOST) {
 		mClientState = MQTTSN_STATE_DISCONNECTED;
-		SetDisconnected();
+		OnDisconnected();
 		if (mDisconnectedCallback) {
 			mDisconnectedCallback(MQTTSN_DISCONNECT_CLIENT, mDisconnectedContext);
 		}
@@ -341,7 +366,7 @@ otError MqttsnClient::Process() {
 
 	// Handle timeout
 	if (mGwTimeout != 0 && mGwTimeout <= now) {
-		SetDisconnected();
+		OnDisconnected();
 		mClientState = MQTTSN_STATE_LOST;
 		if (mDisconnectedCallback) {
 			mDisconnectedCallback(MQTTSN_DISCONNECT_TIMEOUT, mDisconnectedContext);
@@ -674,11 +699,16 @@ exit:
 	return error;
 }
 
-void MqttsnClient::SetDisconnected() {
+void MqttsnClient::OnDisconnected() {
 	mDisconnectRequested = false;
 	mSleepRequested = false;
 	mGwTimeout = 0;
 	mPingReqTime = 0;
+}
+
+bool MqttsnClient::VerifyGatewayAddress(const Ip6::MessageInfo &messageInfo) {
+	return messageInfo.GetPeerAddr() == mConfig.GetAddress()
+			&& messageInfo.GetPeerPort() == mConfig.GetPort();
 }
 
 }
