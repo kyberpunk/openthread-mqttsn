@@ -249,6 +249,8 @@ private:
 
     otError PendingCheckTimeout(void);
 
+    void HandleTimeout(const MessageMetadata &aMetadata);
+
     Ip6::UdpSocket mSocket;
     MqttsnConfig mConfig;
     uint16_t mPacketId;

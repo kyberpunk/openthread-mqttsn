@@ -933,23 +933,7 @@ void MqttsnClient::OnDisconnected()
         message = message->GetNext();
         MessageMetadata metadata;
         metadata.ReadFrom(*current);
-        switch (metadata.mMessageType)
-        {
-        case MQTTSN_SUBSCRIBE:
-            if (metadata.mCallback)
-            {
-                reinterpret_cast<SubscribeCallbackFunc>(metadata.mCallback)(MQTTSN_CODE_TIMEOUT, 0, metadata.mContext);
-            }
-            break;
-        case MQTTSN_REGISTER:
-            if (metadata.mCallback)
-            {
-                reinterpret_cast<RegisterCallbackFunc>(metadata.mCallback)(MQTTSN_CODE_TIMEOUT, 0, metadata.mContext);
-            }
-            break;
-        default:
-            break;
-        }
+        HandleTimeout(metadata);
         PendingDeqeue(*current);
     }
 }
@@ -1007,28 +991,33 @@ otError MqttsnClient::PendingCheckTimeout(void)
         metadata.ReadFrom(*current);
         if (metadata.mTimestamp + metadata.mTimeout * 1000 <= TimerMilli::GetNow())
         {
-            switch (metadata.mMessageType)
-            {
-            case MQTTSN_SUBSCRIBE:
-                if (metadata.mCallback)
-                {
-                    reinterpret_cast<SubscribeCallbackFunc>(metadata.mCallback)(MQTTSN_CODE_TIMEOUT, 0, metadata.mContext);
-                }
-                break;
-            case MQTTSN_REGISTER:
-                if (metadata.mCallback)
-                {
-                    reinterpret_cast<RegisterCallbackFunc>(metadata.mCallback)(MQTTSN_CODE_TIMEOUT, 0, metadata.mContext);
-                }
-                break;
-            default:
-                break;
-            }
+            HandleTimeout(metadata);
             SuccessOrExit(error = PendingDeqeue(*current));
         }
     }
 exit:
     return error;
+}
+
+void MqttsnClient::HandleTimeout(const MessageMetadata &aMetadata)
+{
+    switch (aMetadata.mMessageType)
+    {
+    case MQTTSN_SUBSCRIBE:
+        if (aMetadata.mCallback)
+        {
+            reinterpret_cast<SubscribeCallbackFunc>(aMetadata.mCallback)(MQTTSN_CODE_TIMEOUT, 0, aMetadata.mContext);
+        }
+        break;
+    case MQTTSN_REGISTER:
+        if (aMetadata.mCallback)
+        {
+            reinterpret_cast<RegisterCallbackFunc>(aMetadata.mCallback)(MQTTSN_CODE_TIMEOUT, 0, aMetadata.mContext);
+        }
+        break;
+    default:
+        break;
+    }
 }
 
 }
