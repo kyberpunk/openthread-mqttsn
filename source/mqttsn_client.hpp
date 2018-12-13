@@ -9,8 +9,6 @@
 #include "net/udp6.hpp"
 #include "openthread/error.h"
 
-// TODO: Implement message queue and message specific callback
-
 namespace ot {
 
 namespace Mqttsn {

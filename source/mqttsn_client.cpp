@@ -15,7 +15,6 @@ namespace ot {
 namespace Mqttsn {
 // TODO: Implement QoS and DUP behavior
 // TODO: Implement OT logging
-// TODO: Implement timeouts
 
 MessageMetadata::MessageMetadata()
 {
@@ -103,7 +102,6 @@ static int32_t PacketDecode(unsigned char* aData, size_t aLength)
     return aData[lenlen]; // return the packet type
 }
 
-// TODO: Verify sender address
 void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
 {
     MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
