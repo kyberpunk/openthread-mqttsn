@@ -17,6 +17,7 @@ namespace Mqttsn {
 
 enum ReturnCode
 {
+    MQTTSN_CODE_TIMEOUT = -1,
     MQTTSN_CODE_ACCEPTED = 0,
     MQTTSN_CODE_REJECTED_CONGESTION = 1,
     MQTTSN_CODE_REJECTED_TOPIC_ID = 2,
@@ -49,6 +50,32 @@ enum ClientState
 };
 
 typedef uint16_t TopicId;
+
+class MessageMetadata
+{
+    friend class MqttsnClient;
+
+public:
+    MessageMetadata(void);
+
+    MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, int32_t aMessageType, uint16_t aPacketId, uint32_t aTimestamp, uint32_t aTimeout, void* aCallback, void* aContext);
+
+    otError AppendTo(Message &aMessage) const;
+
+    uint16_t ReadFrom(Message &aMessage);
+
+    uint16_t GetLength(void);
+
+private:
+    Ip6::Address mDestinationAddress;
+    uint16_t mDestinationPort;
+    int32_t mMessageType;
+    uint16_t mPacketId;
+    uint32_t mTimestamp;
+    uint32_t mTimeout;
+    void* mCallback;
+    void* mContext;
+};
 
 class MqttsnConfig
 {
@@ -156,6 +183,8 @@ public:
 
     MqttsnClient(Instance &aInstance);
 
+    ~MqttsnClient(void);
+
     otError Start(uint16_t aPort);
 
     otError Stop(void);
@@ -165,9 +194,9 @@ public:
     otError Connect(MqttsnConfig &aConfig);
 
     // TODO: Overload for other topic types
-    otError Subscribe(const std::string &aTopic, Qos aQos);
+    otError Subscribe(const std::string &aTopic, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext);
 
-    otError Register(const std::string &aTopic);
+    otError Register(const std::string &aTopic, RegisterCallbackFunc aCallback, void* aContext);
 
     otError Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, TopicId aTopicId);
 
@@ -185,15 +214,11 @@ public:
 
     otError SetConnectedCallback(ConnectCallbackFunc aCallback, void* aContext);
 
-    otError SetSubscribeCallback(SubscribeCallbackFunc aCallback, void* aContext);
-
     otError SetPublishReceivedCallback(PublishReceivedCallbackFunc aCallback, void* aContext);
 
     otError SetAdvertiseCallback(AdvertiseCallbackFunc aCallback, void* aContext);
 
     otError SetSearchGwCallback(SearchGwCallbackFunc aCallback, void* aContext);
-
-    otError SetRegisterCallback(RegisterCallbackFunc aCallback, void* aContext);
 
     otError SetPublishedCallback(PublishedCallbackFunc aCallback, void* aContext);
 
@@ -204,17 +229,27 @@ public:
 private:
     static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
 
-    otError SendMessage(unsigned char* aBuffer, int32_t aLength);
+    otError NewMessage(Message **aMessage, unsigned char* aBuffer, int32_t aLength);
 
-    otError SendMessage(unsigned char* aBuffer, int32_t aLength, const Ip6::Address &aAddress, uint16_t aPort);
+    otError SendMessage(Message &aMessage);
 
-    otError SendMessage(unsigned char* aBuffer, int32_t aLength, const Ip6::Address &aAddress, uint16_t aPort, uint8_t aHopLimit);
+    otError SendMessage(Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort);
+
+    otError SendMessage(Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, uint8_t aHopLimit);
 
     otError PingGateway(void);
 
     void OnDisconnected(void);
 
     bool VerifyGatewayAddress(const Ip6::MessageInfo &aMessageInfo);
+
+    otError PendingEnqueue(Message &aMessage, uint16_t aLength, const MessageMetadata &aMetadata);
+
+    Message* PendingFind(uint16_t aPacketId);
+
+    otError PendingDeqeue(Message &aMessage);
+
+    otError PendingCheckTimeout(void);
 
     Ip6::UdpSocket mSocket;
     MqttsnConfig mConfig;
@@ -224,18 +259,15 @@ private:
     bool mDisconnectRequested;
     bool mSleepRequested;
     ClientState mClientState;
+    MessageQueue mPendingQueue;
     ConnectCallbackFunc mConnectCallback;
     void* mConnectContext;
-    SubscribeCallbackFunc mSubscribeCallback;
-    void* mSubscribeContext;
     PublishReceivedCallbackFunc mPublishReceivedCallback;
     void* mPublishReceivedContext;
     AdvertiseCallbackFunc mAdvertiseCallback;
     void* mAdvertiseContext;
     SearchGwCallbackFunc mSearchGwCallback;
     void* mSearchGwContext;
-    RegisterCallbackFunc mRegisterCallback;
-    void* mRegisterContext;
     PublishedCallbackFunc mPublishedCallback;
     void* mPublishedContext;
     UnsubscribedCallbackFunc mUnsubscribedCallback;

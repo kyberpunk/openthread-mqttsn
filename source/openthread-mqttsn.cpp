@@ -128,8 +128,7 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::To
 
 static void MqttsnSubscribe()
 {
-    sClient->SetSubscribeCallback(MqttsnSubscribeCallback, nullptr);
-    sClient->Subscribe(DEFAULT_TOPIC, ot::Mqttsn::Qos::MQTTSN_QOS0);
+    sClient->Subscribe(DEFAULT_TOPIC, ot::Mqttsn::Qos::MQTTSN_QOS0, MqttsnSubscribeCallback, nullptr);
     PRINTF("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
 }
 
