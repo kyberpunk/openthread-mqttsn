@@ -75,10 +75,6 @@ otError WaitingMessagesQueue<CallbackType>::EnqueueCopy(const Message &aMessage,
     otError error = OT_ERROR_NONE;
     Message *messageCopy = nullptr;
 
-    uint16_t messageCount;
-    uint16_t bufferCount;
-    mQueue.GetInfo(messageCount, bufferCount);
-    VerifyOrExit(messageCount < bufferCount, error = OT_ERROR_NO_BUFS);
     VerifyOrExit((messageCopy = aMessage.Clone(aLength)) != NULL, error = OT_ERROR_NO_BUFS);
     SuccessOrExit(error = aMetadata.AppendTo(*messageCopy));
     SuccessOrExit(error = mQueue.Enqueue(*messageCopy));
@@ -692,7 +688,7 @@ otError MqttsnClient::Subscribe(const std::string &aTopic, Qos aQos, SubscribeCa
     SuccessOrExit(error = SendMessage(*message));
     SuccessOrExit(error = mSubscribeQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<SubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mPacketId, TimerMilli::GetNow(),
-            mConfig.GetGatewayTimeout(), aCallback, aContext)));
+            mConfig.GetGatewayTimeout() * 1000, aCallback, aContext)));
     mPacketId++;
 
 exit:
@@ -724,7 +720,7 @@ otError MqttsnClient::Register(const std::string &aTopic, RegisterCallbackFunc a
     SuccessOrExit(error = SendMessage(*message));
     SuccessOrExit(error = mRegisterQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<RegisterCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mPacketId, TimerMilli::GetNow(),
-            mConfig.GetGatewayTimeout(), aCallback, aContext)));
+            mConfig.GetGatewayTimeout() * 1000, aCallback, aContext)));
     mPacketId++;
 
 exit:
@@ -793,7 +789,7 @@ otError MqttsnClient::Unsubscribe(TopicId aTopicId, UnsubscribeCallbackFunc aCal
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = mUnsubscribeQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<UnsubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mPacketId, TimerMilli::GetNow(),
-            mConfig.GetGatewayTimeout(), aCallback, aContext)));
+            mConfig.GetGatewayTimeout() * 1000, aCallback, aContext)));
     SuccessOrExit(error = SendMessage(*message));
     mPacketId++;
 

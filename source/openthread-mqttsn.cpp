@@ -130,7 +130,6 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::To
     else
     {
         PRINTF("Subscription failed with code: %d.\r\n", aCode);
-        sState = STATE_MQTT_CONNECTED;
     }
 }
 
