@@ -23,7 +23,7 @@
 #define GATEWAY_PORT 10000
 #define GATEWAY_ADDRESS "2018:ff9b::ac12:8"
 
-#define GATEWAY_SEARCH 0
+#define GATEWAY_SEARCH 1
 #define GATEWAY_MULTICAST_PORT 1883
 #define GATEWAY_MULTICAST_ADDRESS "2018:ff9b::e101:101"
 #define GATEWAY_MULTICAST_RADIUS 4
@@ -161,8 +161,6 @@ static void AdvertiseCallback(const ot::Ip6::Address &aAddress, uint16_t aPort, 
 
 static void SearchGateway(const char* aMulticastAddress, uint16_t aPort)
 {
-    OT_UNUSED_VARIABLE(aContext);
-
     otError error = OT_ERROR_NONE;
     ot::Ip6::Address address;
     address.FromString(aMulticastAddress);
