@@ -49,30 +49,58 @@ enum ClientState
 
 typedef uint16_t TopicId;
 
+template <typename CallbackType>
 class MessageMetadata
 {
     friend class MqttsnClient;
+    friend class WaitingMessagesQueue;
 
 public:
     MessageMetadata(void);
 
-    MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, int32_t aMessageType, uint16_t aPacketId, uint32_t aTimestamp, uint32_t aTimeout, void* aCallback, void* aContext);
+    MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aPacketId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, CallbackType aCallback, void* aContext);
 
     otError AppendTo(Message &aMessage) const;
 
     uint16_t ReadFrom(Message &aMessage);
 
-    uint16_t GetLength(void);
+    uint16_t GetLength(void) const;
 
 private:
     Ip6::Address mDestinationAddress;
     uint16_t mDestinationPort;
-    int32_t mMessageType;
     uint16_t mPacketId;
     uint32_t mTimestamp;
-    uint32_t mTimeout;
-    void* mCallback;
+    uint32_t mRetransmissionTimeout;
+    uint8_t mRetransmissionCount;
+    CallbackType mCallback;
     void* mContext;
+};
+
+template <typename CallbackType>
+class WaitingMessagesQueue
+{
+public:
+    typedef void (*TimeoutCallbackFunc)(const MessageMetadata<CallbackType> &aMetadata, void* aContext);
+
+    WaitingMessagesQueue(TimeoutCallbackFunc aTimeoutCallback, void* aTimeoutContext);
+
+    ~WaitingMessagesQueue(void);
+
+    otError EnqueueCopy(const Message &aMessage, uint16_t aLength, const MessageMetadata<CallbackType> &aMetadata);
+
+    otError Dequeue(Message &aMessage);
+
+    Message* Find(uint16_t aPacketId, MessageMetadata<CallbackType> &aMetadata);
+
+    otError HandleTimer(void);
+
+    void ForceTimeout(void);
+
+private:
+    MessageQueue mQueue;
+    TimeoutCallbackFunc mTimeoutCallback;
+    void* mTimeoutContext;
 };
 
 class MqttsnConfig
@@ -175,7 +203,7 @@ public:
 
     typedef void (*PublishedCallbackFunc)(ReturnCode aCode, TopicId aTopicId, void* aContext);
 
-    typedef void (*UnsubscribedCallbackFunc)(void* aContext);
+    typedef void (*UnsubscribeCallbackFunc)(ReturnCode aCode, void* aContext);
 
     typedef void (*DisconnectedCallbackFunc)(DisconnectType aType, void* aContext);
 
@@ -198,7 +226,7 @@ public:
 
     otError Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, TopicId aTopicId);
 
-    otError Unsubscribe(TopicId aTopicId);
+    otError Unsubscribe(TopicId aTopicId, UnsubscribeCallbackFunc aCallback, void* aContext);
 
     otError Disconnect(void);
 
@@ -220,8 +248,6 @@ public:
 
     otError SetPublishedCallback(PublishedCallbackFunc aCallback, void* aContext);
 
-    otError SetUnsubscribedCallback(UnsubscribedCallbackFunc aCallback, void* aContext);
-
     otError SetDisconnectedCallback(DisconnectedCallbackFunc aCallback, void* aContext);
 
 private:
@@ -241,15 +267,11 @@ private:
 
     bool VerifyGatewayAddress(const Ip6::MessageInfo &aMessageInfo);
 
-    otError PendingEnqueue(Message &aMessage, uint16_t aLength, const MessageMetadata &aMetadata);
+    static void HandleSubscribeTimeout(const MessageMetadata<SubscribeCallbackFunc> &aMetadata, void* aContext);
 
-    Message* PendingFind(uint16_t aPacketId);
+    static void HandleRegisterTimeout(const MessageMetadata<RegisterCallbackFunc> &aMetadata, void* aContext);
 
-    otError PendingDeqeue(Message &aMessage);
-
-    otError PendingCheckTimeout(void);
-
-    void HandleTimeout(const MessageMetadata &aMetadata);
+    static void HandleUnsubscribeTimeout(const MessageMetadata<UnsubscribeCallbackFunc> &aMetadata, void* aContext);
 
     Ip6::UdpSocket mSocket;
     MqttsnConfig mConfig;
@@ -259,7 +281,9 @@ private:
     bool mDisconnectRequested;
     bool mSleepRequested;
     ClientState mClientState;
-    MessageQueue mPendingQueue;
+    WaitingMessagesQueue<SubscribeCallbackFunc> mSubscribeQueue;
+    WaitingMessagesQueue<RegisterCallbackFunc> mRegisterQueue;
+    WaitingMessagesQueue<UnsubscribeCallbackFunc> mUnsubscribeQueue;
     ConnectCallbackFunc mConnectCallback;
     void* mConnectContext;
     PublishReceivedCallbackFunc mPublishReceivedCallback;
@@ -270,8 +294,6 @@ private:
     void* mSearchGwContext;
     PublishedCallbackFunc mPublishedCallback;
     void* mPublishedContext;
-    UnsubscribedCallbackFunc mUnsubscribedCallback;
-    void* mUnsubscribedContext;
     DisconnectedCallbackFunc mDisconnectedCallback;
     void* mDisconnectedContext;
 };

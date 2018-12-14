@@ -16,38 +16,144 @@ namespace Mqttsn {
 // TODO: Implement QoS and DUP behavior
 // TODO: Implement OT logging
 
-MessageMetadata::MessageMetadata()
+template <typename CallbackType>
+MessageMetadata<CallbackType>::MessageMetadata()
 {
     ;
 }
 
-MessageMetadata::MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, int32_t aMessageType, uint16_t aPacketId, uint32_t aTimestamp, uint32_t aTimeout, void* aCallback, void* aContext)
+template <typename CallbackType>
+MessageMetadata<CallbackType>::MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aPacketId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, CallbackType aCallback, void* aContext)
     : mDestinationAddress(aDestinationAddress)
     , mDestinationPort(aDestinationPort)
-    , mMessageType(aMessageType)
     , mPacketId(aPacketId)
     , mTimestamp(aTimestamp)
-    , mTimeout(aTimeout)
+    , mRetransmissionTimeout(aRetransmissionTimeout)
+    , mRetransmissionCount(0)
     , mCallback(aCallback)
     , mContext(aContext)
 {
     ;
 }
 
-otError MessageMetadata::AppendTo(Message &aMessage) const
+template <typename CallbackType>
+otError MessageMetadata<CallbackType>::AppendTo(Message &aMessage) const
 {
     return aMessage.Append(this, sizeof(*this));
 }
 
-uint16_t MessageMetadata::ReadFrom(Message &aMessage)
+template <typename CallbackType>
+uint16_t MessageMetadata<CallbackType>::ReadFrom(Message &aMessage)
 {
     return aMessage.Read(aMessage.GetLength() - sizeof(*this), sizeof(*this), this);
 }
 
-uint16_t MessageMetadata::GetLength()
+template <typename CallbackType>
+uint16_t MessageMetadata<CallbackType>::GetLength() const
 {
     return sizeof(*this);
 }
+
+template <typename CallbackType>
+WaitingMessagesQueue<CallbackType>::WaitingMessagesQueue(TimeoutCallbackFunc aTimeoutCallback, void* aTimeoutContext)
+    : mQueue()
+    , mTimeoutCallback(aTimeoutCallback)
+    , mTimeoutContext(aTimeoutContext)
+{
+    ;
+}
+
+template <typename CallbackType>
+WaitingMessagesQueue<CallbackType>::~WaitingMessagesQueue(void)
+{
+    ForceTimeout();
+}
+
+template <typename CallbackType>
+otError WaitingMessagesQueue<CallbackType>::EnqueueCopy(const Message &aMessage, uint16_t aLength, const MessageMetadata<CallbackType> &aMetadata)
+{
+    otError error = OT_ERROR_NONE;
+    Message *messageCopy = nullptr;
+
+    uint16_t messageCount;
+    uint16_t bufferCount;
+    mQueue.GetInfo(&messageCount, &bufferCount);
+    VerifyOrExit(messageCount < bufferCount, error = OT_ERROR_NO_BUFS);
+    VerifyOrExit((messageCopy = aMessage.Clone(aLength)) != NULL, error = OT_ERROR_NO_BUFS);
+    SuccessOrExit(error = aMetadata.AppendTo(*messageCopy));
+    SuccessOrExit(error = mQueue.Enqueue(*messageCopy));
+
+exit:
+    return error;
+}
+
+template <typename CallbackType>
+otError WaitingMessagesQueue<CallbackType>::Dequeue(Message &aMessage)
+{
+    otError error = mQueue.Dequeue(aMessage);
+    aMessage.Free();
+    return error;
+}
+
+template <typename CallbackType>
+Message* WaitingMessagesQueue<CallbackType>::Find(uint16_t aPacketId, MessageMetadata<CallbackType> &aMetadata)
+{
+    Message* message = mQueue.GetHead();
+    while (message)
+    {
+        aMetadata.ReadFrom(*message);
+        if (aPacketId == aMetadata.mPacketId)
+        {
+            return message;
+        }
+        message = message->GetNext();
+    }
+    return nullptr;
+}
+
+template <typename CallbackType>
+otError WaitingMessagesQueue<CallbackType>::HandleTimer()
+{
+    otError error = OT_ERROR_NONE;
+    Message* message = mQueue.GetHead();
+    while (message)
+    {
+        Message* current = message;
+        message = message->GetNext();
+        MessageMetadata<CallbackType> metadata;
+        metadata.ReadFrom(*current);
+        if (metadata.mTimstamp + metadata.mRetransmissionTimeout <= TimerMilli::GetNow())
+        {
+            if (mTimeoutCallback)
+            {
+                mTimeoutCallback(metadata, mTimeoutContext);
+            }
+            SuccessOrExit(error = Dequeue(*current));
+        }
+    }
+exit:
+    return error;
+}
+
+template <typename CallbackType>
+void WaitingMessagesQueue<CallbackType>::ForceTimeout()
+{
+    Message* message = mQueue.GetHead();
+    while (message)
+    {
+        Message* current = message;
+        message = message->GetNext();
+        MessageMetadata<CallbackType> metadata;
+        metadata.ReadFrom(*current);
+        if (mTimeoutCallback)
+        {
+            mTimeoutCallback(metadata, mTimeoutContext);
+        }
+        Dequeue(*current);
+    }
+}
+
+
 
 MqttsnClient::MqttsnClient(Instance& instance)
     : InstanceLocator(instance)
@@ -59,7 +165,9 @@ MqttsnClient::MqttsnClient(Instance& instance)
     , mDisconnectRequested(false)
     , mSleepRequested(false)
     , mClientState(MQTTSN_STATE_DISCONNECTED)
-    , mPendingQueue()
+    , mSubscribeQueue(HandleSubscribeTimeout, this)
+    , mRegisterQueue(HandleRegisterTimeout, this)
+    , mUnsubscribeQueue(HandleUnsubscribeTimeout, this)
     , mConnectCallback(nullptr)
     , mConnectContext(nullptr)
     , mPublishReceivedCallback(nullptr)
@@ -70,8 +178,6 @@ MqttsnClient::MqttsnClient(Instance& instance)
     , mSearchGwContext(nullptr)
     , mPublishedCallback(nullptr)
     , mPublishedContext(nullptr)
-    , mUnsubscribedCallback(nullptr)
-    , mUnsubscribedContext(nullptr)
     , mDisconnectedCallback(nullptr)
     , mDisconnectedContext(nullptr)
 {
@@ -185,19 +291,18 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
-        Message* message = client->PendingFind(packetId);
+
+        MessageMetadata<SubscribeCallbackFunc> metadata;
+        Message* message = client->mSubscribeQueue.Find(packetId, metadata);
         if (!message)
         {
             break;
         }
-        MessageMetadata metadata;
-        metadata.ReadFrom(*message);
         if (metadata.mCallback)
         {
-            reinterpret_cast<SubscribeCallbackFunc>(metadata.mCallback)(
-                static_cast<ReturnCode>(subscribeReturnCode), static_cast<TopicId>(topicId), metadata.mCallback);
+            metadata.mCallback(static_cast<ReturnCode>(subscribeReturnCode), static_cast<TopicId>(topicId), metadata.mContext);
         }
-        client->PendingDeqeue(*message);
+        client->mSubscribeQueue.Dequeue(*message);
     }
         break;
     case MQTTSN_PUBLISH:
@@ -284,19 +389,17 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
-        Message* message = client->PendingFind(packetId);
+        MessageMetadata<RegisterCallbackFunc> metadata;
+        Message* message = client->mRegisterQueue.Find(packetId, metadata);
         if (!message)
         {
             break;
         }
-        MessageMetadata metadata;
-        metadata.ReadFrom(*message);
         if (metadata.mCallback)
         {
-            reinterpret_cast<RegisterCallbackFunc>(metadata.mCallback)(
-                static_cast<ReturnCode>(returnCode), static_cast<TopicId>(topicId), metadata.mCallback);
+            metadata.mCallback(static_cast<ReturnCode>(returnCode), static_cast<TopicId>(topicId), metadata.mContext);
         }
-        client->PendingDeqeue(*message);
+        client->mRegisterQueue.Dequeue(*message);
     }
         break;
     case MQTTSN_PUBACK:
@@ -340,10 +443,17 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
-        if (client->mUnsubscribedCallback)
+        MessageMetadata<UnsubscribeCallbackFunc> metadata;
+        Message* message = client->mUnsubscribeQueue.Find(packetId, metadata);
+        if (!message)
         {
-            client->mUnsubscribedCallback(client->mUnsubscribedContext);
+            break;
         }
+        if (metadata.mCallback)
+        {
+            metadata.mCallback(ReturnCode::MQTTSN_CODE_ACCEPTED, metadata.mContext);
+        }
+        client->mUnsubscribeQueue.Dequeue(*message);
     }
         break;
     case MQTTSN_PINGREQ:
@@ -410,8 +520,8 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         switch (client->mClientState)
         {
         case MQTTSN_STATE_ACTIVE:
-            case MQTTSN_STATE_AWAKE:
-            case MQTTSN_STATE_ASLEEP:
+        case MQTTSN_STATE_AWAKE:
+        case MQTTSN_STATE_ASLEEP:
             if (client->mDisconnectRequested)
             {
                 client->mClientState = MQTTSN_STATE_DISCONNECTED;
@@ -499,7 +609,9 @@ otError MqttsnClient::Process()
     }
 
     // Handle pending messages timeouts
-    PendingCheckTimeout();
+    mSubscribeQueue.HandleTimer();
+    mRegisterQueue.HandleTimer();
+    mUnsubscribeQueue.HandleTimer();
 
 exit:
     return error;
@@ -578,9 +690,9 @@ otError MqttsnClient::Subscribe(const std::string &aTopic, Qos aQos, SubscribeCa
     }
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
-    SuccessOrExit(error = PendingEnqueue(*message, message->GetLength(),
-        MessageMetadata(mConfig.GetAddress(), mConfig.GetPort(), MQTTSN_PUBLISH, mPacketId,
-            TimerMilli::GetNow(), mConfig.GetGatewayTimeout(), reinterpret_cast<void*>(aCallback), aContext)));
+    SuccessOrExit(error = mSubscribeQueue.EnqueueCopy(*message, message->GetLength(),
+        MessageMetadata<SubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mPacketId, TimerMilli::GetNow(),
+            mConfig.GetGatewayTimeout(), aCallback, aContext)));
     mPacketId++;
 
 exit:
@@ -610,9 +722,9 @@ otError MqttsnClient::Register(const std::string &aTopic, RegisterCallbackFunc a
     }
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
-    SuccessOrExit(error = PendingEnqueue(*message, message->GetLength(),
-        MessageMetadata(mConfig.GetAddress(), mConfig.GetPort(), MQTTSN_REGISTER, mPacketId,
-            TimerMilli::GetNow(), mConfig.GetGatewayTimeout(), reinterpret_cast<void*>(aCallback), aContext)));
+    SuccessOrExit(error = mRegisterQueue.EnqueueCopy(*message, message->GetLength(),
+        MessageMetadata<RegisterCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mPacketId, TimerMilli::GetNow(),
+            mConfig.GetGatewayTimeout(), aCallback, aContext)));
     mPacketId++;
 
 exit:
@@ -656,7 +768,7 @@ exit:
     return error;
 }
 
-otError MqttsnClient::Unsubscribe(TopicId aTopicId)
+otError MqttsnClient::Unsubscribe(TopicId aTopicId, UnsubscribeCallbackFunc aCallback, void* aContext)
 {
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
@@ -672,14 +784,18 @@ otError MqttsnClient::Unsubscribe(TopicId aTopicId)
     MQTTSN_topicid topic;
     topic.type = MQTTSN_TOPIC_TYPE_NORMAL;
     topic.data.id = static_cast<unsigned short>(aTopicId);
-    length = MQTTSNSerialize_unsubscribe(buffer, MAX_PACKET_SIZE, mPacketId++, &topic);
+    length = MQTTSNSerialize_unsubscribe(buffer, MAX_PACKET_SIZE, mPacketId, &topic);
     if (length <= 0)
     {
         error = OT_ERROR_FAILED;
         goto exit;
     }
     SuccessOrExit(error = NewMessage(&message, buffer, length));
+    SuccessOrExit(error = mUnsubscribeQueue.EnqueueCopy(*message, message->GetLength(),
+        MessageMetadata<UnsubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mPacketId, TimerMilli::GetNow(),
+            mConfig.GetGatewayTimeout(), aCallback, aContext)));
     SuccessOrExit(error = SendMessage(*message));
+    mPacketId++;
 
 exit:
     return error;
@@ -822,13 +938,6 @@ otError MqttsnClient::SetPublishedCallback(PublishedCallbackFunc aCallback, void
     return OT_ERROR_NONE;
 }
 
-otError MqttsnClient::SetUnsubscribedCallback(UnsubscribedCallbackFunc aCallback, void* aContext)
-{
-    mUnsubscribedCallback = aCallback;
-    mUnsubscribedContext = aContext;
-    return OT_ERROR_NONE;
-}
-
 otError MqttsnClient::SetDisconnectedCallback(DisconnectedCallbackFunc aCallback, void* aContext)
 {
     mDisconnectedCallback = aCallback;
@@ -926,16 +1035,9 @@ void MqttsnClient::OnDisconnected()
     mGwTimeout = 0;
     mPingReqTime = 0;
 
-    Message* message = mPendingQueue.GetHead();
-    while (message)
-    {
-        Message* current = message;
-        message = message->GetNext();
-        MessageMetadata metadata;
-        metadata.ReadFrom(*current);
-        HandleTimeout(metadata);
-        PendingDeqeue(*current);
-    }
+    mSubscribeQueue.ForceTimeout();
+    mRegisterQueue.ForceTimeout();
+    mUnsubscribeQueue.ForceTimeout();
 }
 
 bool MqttsnClient::VerifyGatewayAddress(const Ip6::MessageInfo &aMessageInfo)
@@ -944,80 +1046,25 @@ bool MqttsnClient::VerifyGatewayAddress(const Ip6::MessageInfo &aMessageInfo)
         && aMessageInfo.GetPeerPort() == mConfig.GetPort();
 }
 
-otError MqttsnClient::PendingEnqueue(Message &aMessage, uint16_t aLength, const MessageMetadata &aMetadata)
+void MqttsnClient::HandleSubscribeTimeout(const MessageMetadata<SubscribeCallbackFunc> &aMetadata, void* aContext)
 {
-    otError error = OT_ERROR_NONE;
-    Message *messageCopy = NULL;
+    OT_UNUSED_VARIABLE(aContext);
 
-    VerifyOrExit((messageCopy = aMessage.Clone(aLength)) != NULL, error = OT_ERROR_NO_BUFS);
-    SuccessOrExit(error = aMetadata.AppendTo(*messageCopy));
-    SuccessOrExit(error = mPendingQueue.Enqueue(*messageCopy));
-
-exit:
-    return error;
+    aMetadata.mCallback(MQTTSN_CODE_TIMEOUT, 0, aMetadata.mContext);
 }
 
-Message* MqttsnClient::PendingFind(uint16_t aPacketId)
+void MqttsnClient::HandleRegisterTimeout(const MessageMetadata<RegisterCallbackFunc> &aMetadata, void* aContext)
 {
-    Message* message = mPendingQueue.GetHead();
-    MessageMetadata metadata;
-    while (message)
-    {
-        metadata.ReadFrom(*message);
-        if (aPacketId == metadata.mPacketId) {
-            return message;
-        }
-        message = message->GetNext();
-    }
-    return nullptr;
+    OT_UNUSED_VARIABLE(aContext);
+
+    aMetadata.mCallback(MQTTSN_CODE_TIMEOUT, 0, aMetadata.mContext);
 }
 
-otError MqttsnClient::PendingDeqeue(Message &aMessage)
+void MqttsnClient::HandleUnsubscribeTimeout(const MessageMetadata<UnsubscribeCallbackFunc> &aMetadata, void* aContext)
 {
-    otError error = mPendingQueue.Dequeue(aMessage);
-    aMessage.Free();
-    return error;
-}
+    OT_UNUSED_VARIABLE(aContext);
 
-otError MqttsnClient::PendingCheckTimeout(void)
-{
-    otError error = OT_ERROR_NONE;
-    Message* message = mPendingQueue.GetHead();
-    while (message)
-    {
-        Message* current = message;
-        message = message->GetNext();
-        MessageMetadata metadata;
-        metadata.ReadFrom(*current);
-        if (metadata.mTimestamp + metadata.mTimeout * 1000 <= TimerMilli::GetNow())
-        {
-            HandleTimeout(metadata);
-            SuccessOrExit(error = PendingDeqeue(*current));
-        }
-    }
-exit:
-    return error;
-}
-
-void MqttsnClient::HandleTimeout(const MessageMetadata &aMetadata)
-{
-    switch (aMetadata.mMessageType)
-    {
-    case MQTTSN_SUBSCRIBE:
-        if (aMetadata.mCallback)
-        {
-            reinterpret_cast<SubscribeCallbackFunc>(aMetadata.mCallback)(MQTTSN_CODE_TIMEOUT, 0, aMetadata.mContext);
-        }
-        break;
-    case MQTTSN_REGISTER:
-        if (aMetadata.mCallback)
-        {
-            reinterpret_cast<RegisterCallbackFunc>(aMetadata.mCallback)(MQTTSN_CODE_TIMEOUT, 0, aMetadata.mContext);
-        }
-        break;
-    default:
-        break;
-    }
+    aMetadata.mCallback(MQTTSN_CODE_TIMEOUT, aMetadata.mContext);
 }
 
 }
