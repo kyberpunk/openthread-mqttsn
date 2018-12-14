@@ -58,6 +58,8 @@ static uint32_t sSearchGwTimeoutTime = 0;
 
 static void MqttsnConnectedCallback(ot::Mqttsn::ReturnCode aCode, void* aContext)
 {
+    OT_UNUSED_VARIABLE(aContext);
+
     if (aCode == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED)
     {
         PRINTF("Successfully connected.\r\n");
@@ -72,12 +74,16 @@ static void MqttsnConnectedCallback(ot::Mqttsn::ReturnCode aCode, void* aContext
 
 static void MqttsnDisconnectedCallback(ot::Mqttsn::DisconnectType aType, void* aContext)
 {
+    OT_UNUSED_VARIABLE(aContext);
+
     PRINTF("Client disconnected. Reason: %d.\r\n", aType);
     sState = STATE_THREAD_STARTED;
 }
 
 static void MqttsnReceived(const uint8_t* aPayload, int32_t aPayloadLength, ot::Mqttsn::Qos aQos, ot::Mqttsn::TopicId topicId, void* aContext)
 {
+    OT_UNUSED_VARIABLE(aContext);
+
     PRINTF("Message received from topic %d with QoS %d:\r\n", topicId, aQos);
     for (int i = 0; i < aPayloadLength; i++)
     {
@@ -111,6 +117,8 @@ static void MqttsnConnect(const ot::Ip6::Address &aAddress, uint16_t aPort)
 
 static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::TopicId aTopicId, void* aContext)
 {
+    OT_UNUSED_VARIABLE(aContext);
+
     if (aCode == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED)
     {
         PRINTF("Successfully subscribed to topic: %d.\r\n", aTopicId);
@@ -135,6 +143,8 @@ static void MqttsnSubscribe()
 #if GATEWAY_SEARCH
 static void SearchGatewayCallback(const ot::Ip6::Address &aAddress, uint16_t aPort, uint8_t aGatewayId, void* aContext)
 {
+    OT_UNUSED_VARIABLE(aContext);
+
     PRINTF("SearchGw found gateway with id: %u, %s:%u\r\n", aGatewayId, aAddress.ToString().AsCString(), aPort);
     sGatewayAddress = aAddress;
     sGatewayPort = aPort;
@@ -144,6 +154,8 @@ static void SearchGatewayCallback(const ot::Ip6::Address &aAddress, uint16_t aPo
 
 static void AdvertiseCallback(const ot::Ip6::Address &aAddress, uint16_t aPort, uint8_t aGatewayId, uint32_t aDuration, void* aContext)
 {
+    OT_UNUSED_VARIABLE(aContext);
+
     PRINTF("Received gateway advertise with id: %u, %s:%u\r\n", aGatewayId, aAddress.ToString().AsCString(), aPort);
     sGatewayAddress = aAddress;
     sGatewayPort = aPort;
@@ -153,6 +165,8 @@ static void AdvertiseCallback(const ot::Ip6::Address &aAddress, uint16_t aPort, 
 
 static void SearchGateway(const std::string &aMulticastAddress, uint16_t aPort)
 {
+    OT_UNUSED_VARIABLE(aContext);
+
     otError error = OT_ERROR_NONE;
     ot::Ip6::Address address;
     address.FromString(aMulticastAddress.c_str());
@@ -286,7 +300,6 @@ extern "C" void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const ch
 {
     OT_UNUSED_VARIABLE(aLogLevel);
     OT_UNUSED_VARIABLE(aLogRegion);
-    OT_UNUSED_VARIABLE(aFormat);
 
     va_list ap;
     va_start(ap, aFormat);

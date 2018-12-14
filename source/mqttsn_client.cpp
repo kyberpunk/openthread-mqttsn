@@ -77,7 +77,7 @@ otError WaitingMessagesQueue<CallbackType>::EnqueueCopy(const Message &aMessage,
 
     uint16_t messageCount;
     uint16_t bufferCount;
-    mQueue.GetInfo(&messageCount, &bufferCount);
+    mQueue.GetInfo(messageCount, bufferCount);
     VerifyOrExit(messageCount < bufferCount, error = OT_ERROR_NO_BUFS);
     VerifyOrExit((messageCopy = aMessage.Clone(aLength)) != NULL, error = OT_ERROR_NO_BUFS);
     SuccessOrExit(error = aMetadata.AppendTo(*messageCopy));
@@ -122,7 +122,7 @@ otError WaitingMessagesQueue<CallbackType>::HandleTimer()
         message = message->GetNext();
         MessageMetadata<CallbackType> metadata;
         metadata.ReadFrom(*current);
-        if (metadata.mTimstamp + metadata.mRetransmissionTimeout <= TimerMilli::GetNow())
+        if (metadata.mTimestamp + metadata.mRetransmissionTimeout <= TimerMilli::GetNow())
         {
             if (mTimeoutCallback)
             {

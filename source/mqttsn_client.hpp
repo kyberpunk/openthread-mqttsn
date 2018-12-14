@@ -50,10 +50,13 @@ enum ClientState
 typedef uint16_t TopicId;
 
 template <typename CallbackType>
+class WaitingMessagesQueue;
+
+template <typename CallbackType>
 class MessageMetadata
 {
     friend class MqttsnClient;
-    friend class WaitingMessagesQueue;
+    friend class WaitingMessagesQueue<CallbackType>;
 
 public:
     MessageMetadata(void);
