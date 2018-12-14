@@ -13,36 +13,36 @@ namespace Mqttsn {
 
 enum ReturnCode
 {
-    MQTTSN_CODE_ACCEPTED = 0,
-    MQTTSN_CODE_REJECTED_CONGESTION = 1,
-    MQTTSN_CODE_REJECTED_TOPIC_ID = 2,
-    MQTTSN_CODE_REJECTED_NOT_SUPPORTED = 3,
-    MQTTSN_CODE_TIMEOUT = -1,
+    kCodeAccepted = 0,
+    kCodeRejectedCongestion = 1,
+    kCodeRejectedTopicId = 2,
+    kCodeRejectedNotSupported = 3,
+    kCodeTimeout = -1,
 };
 
 enum Qos
 {
-    MQTTSN_QOS0 = 0x0,
-    MQTTSN_QOS1 = 0x1,
-    MQTTSN_QOS2 = 0x2,
-    MQTTSN_QOSm1 = 0x3
+    kQos0 = 0x0,
+    kQos1 = 0x1,
+    kQos2 = 0x2,
+    kQosm1 = 0x3
 };
 
 enum DisconnectType
 {
-    MQTTSN_DISCONNECT_SERVER,
-    MQTTSN_DISCONNECT_CLIENT,
-    MQTTSN_DISCONNECT_ASLEEP,
-    MQTTSN_DISCONNECT_TIMEOUT
+    kServer,
+    kClient,
+    kAsleep,
+    kTimeout
 };
 
 enum ClientState
 {
-    MQTTSN_STATE_DISCONNECTED,
-    MQTTSN_STATE_ACTIVE,
-    MQTTSN_STATE_ASLEEP,
-    MQTTSN_STATE_AWAKE,
-    MQTTSN_STATE_LOST,
+    kStateDisconnected,
+    kStateActive,
+    kStateAsleep,
+    kStateAwake,
+    kStateLost,
 };
 
 typedef uint16_t TopicId;

@@ -36,17 +36,17 @@
 
 enum ApplicationState
 {
-    STATE_STARTED,
-    STATE_INITIALIZED,
-    STATE_THREAD_STARTING,
-    STATE_THREAD_STARTED,
-    STATE_MQTT_SEARCHGW,
-    STATE_MQTT_CONNECTING,
-    STATE_MQTT_CONNECTED,
-    STATE_MQTT_RUNNING
+    kStarted,
+    kInitialized,
+    kThreadStarting,
+    kThreadStarted,
+    kMqttSearchGw,
+    kMqttConnecting,
+    kMqttConnected,
+    kMqttRunning
 };
 
-static ApplicationState sState = STATE_STARTED;
+static ApplicationState sState = kStarted;
 static ot::Mqttsn::MqttsnClient* sClient = nullptr;
 static uint32_t sConnectionTimeoutTime = 0;
 static otNetifAddress sSlaacAddresses[OPENTHREAD_CONFIG_NUM_SLAAC_ADDRESSES];
@@ -60,15 +60,15 @@ static void MqttsnConnectedCallback(ot::Mqttsn::ReturnCode aCode, void* aContext
 {
     OT_UNUSED_VARIABLE(aContext);
 
-    if (aCode == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED)
+    if (aCode == ot::Mqttsn::kCodeAccepted)
     {
         PRINTF("Successfully connected.\r\n");
-        sState = STATE_MQTT_CONNECTED;
+        sState = kMqttConnected;
     }
     else
     {
         PRINTF("Connection failed with code: %d.\r\n", aCode);
-        sState = STATE_THREAD_STARTED;
+        sState = kThreadStarted;
     }
 }
 
@@ -77,7 +77,7 @@ static void MqttsnDisconnectedCallback(ot::Mqttsn::DisconnectType aType, void* a
     OT_UNUSED_VARIABLE(aContext);
 
     PRINTF("Client disconnected. Reason: %d.\r\n", aType);
-    sState = STATE_THREAD_STARTED;
+    sState = kThreadStarted;
 }
 
 static void MqttsnReceived(const uint8_t* aPayload, int32_t aPayloadLength, ot::Mqttsn::Qos aQos, ot::Mqttsn::TopicId topicId, void* aContext)
@@ -119,10 +119,10 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::To
 {
     OT_UNUSED_VARIABLE(aContext);
 
-    if (aCode == ot::Mqttsn::ReturnCode::MQTTSN_CODE_ACCEPTED)
+    if (aCode == ot::Mqttsn::kCodeAccepted)
     {
         PRINTF("Successfully subscribed to topic: %d.\r\n", aTopicId);
-        sState = STATE_MQTT_RUNNING;
+        sState = kMqttRunning;
     }
     else
     {
@@ -132,7 +132,7 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::To
 
 static void MqttsnSubscribe()
 {
-    sClient->Subscribe(DEFAULT_TOPIC, ot::Mqttsn::Qos::MQTTSN_QOS0, MqttsnSubscribeCallback, nullptr);
+    sClient->Subscribe(DEFAULT_TOPIC, ot::Mqttsn::Qos::kQos0, MqttsnSubscribeCallback, nullptr);
     PRINTF("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
 }
 
@@ -145,7 +145,7 @@ static void SearchGatewayCallback(const ot::Ip6::Address &aAddress, uint16_t aPo
     sGatewayAddress = aAddress;
     sGatewayPort = aPort;
     MqttsnConnect(sGatewayAddress, sGatewayPort);
-    sState = STATE_MQTT_CONNECTING;
+    sState = kMqttConnecting;
 }
 
 static void AdvertiseCallback(const ot::Ip6::Address &aAddress, uint16_t aPort, uint8_t aGatewayId, uint32_t aDuration, void* aContext)
@@ -156,7 +156,7 @@ static void AdvertiseCallback(const ot::Ip6::Address &aAddress, uint16_t aPort, 
     sGatewayAddress = aAddress;
     sGatewayPort = aPort;
     MqttsnConnect(sGatewayAddress, sGatewayPort);
-    sState = STATE_MQTT_CONNECTING;
+    sState = kMqttConnecting;
 }
 
 static void SearchGateway(const char* aMulticastAddress, uint16_t aPort)
@@ -175,7 +175,7 @@ static void SearchGateway(const char* aMulticastAddress, uint16_t aPort)
     {
         PRINTF("Search gateway failed with error: %d.\r\n", error);
     }
-    sState = STATE_MQTT_SEARCHGW;
+    sState = kMqttSearchGw;
 }
 #endif
 
@@ -184,15 +184,15 @@ static void ProcessWorker(ot::Instance &aInstance)
     otDeviceRole role;
     switch (sState)
     {
-    case STATE_THREAD_STARTING:
+    case kThreadStarting:
         role = aInstance.GetThreadNetif().GetMle().GetRole();
         if (role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_LEADER || role == OT_DEVICE_ROLE_ROUTER)
         {
             PRINTF("Thread started. Role: %d.\r\n", role);
-            sState = STATE_THREAD_STARTED;
+            sState = kThreadStarted;
         }
         break;
-    case STATE_THREAD_STARTED:
+    case kThreadStarted:
         #if GATEWAY_SEARCH
         SearchGateway(GATEWAY_MULTICAST_ADDRESS, GATEWAY_MULTICAST_PORT);
 #else
@@ -200,30 +200,30 @@ static void ProcessWorker(ot::Instance &aInstance)
         address.FromString(GATEWAY_ADDRESS);
         MqttsnConnect(address, GATEWAY_PORT);
         sConnectionTimeoutTime = ot::TimerMilli::GetNow() + SEND_TIMEOUT;
-        sState = STATE_MQTT_CONNECTING;
+        sState = kMqttConnecting;
 #endif
         break;
 #if GATEWAY_SEARCH
-    case STATE_MQTT_SEARCHGW:
+    case kMqttSearchGw:
         if (sConnectionTimeoutTime != 0 && sConnectionTimeoutTime < ot::TimerMilli::GetNow())
         {
             role = aInstance.GetThreadNetif().GetMle().GetRole();
             PRINTF("Connection timeout. Role: %d\r\n", role);
-            sState = STATE_THREAD_STARTED;
+            sState = kThreadStarted;
         }
         break;
 #endif
-    case STATE_MQTT_CONNECTING:
+    case kMqttConnecting:
         if (sConnectionTimeoutTime != 0 && sConnectionTimeoutTime < ot::TimerMilli::GetNow())
         {
             role = aInstance.GetThreadNetif().GetMle().GetRole();
             PRINTF("Connection timeout. Role: %d\r\n", role);
-            sState = STATE_THREAD_STARTED;
+            sState = kThreadStarted;
         }
         break;
-    case STATE_MQTT_CONNECTED:
+    case kMqttConnected:
         MqttsnSubscribe();
-        sState = STATE_MQTT_RUNNING;
+        sState = kMqttRunning;
         break;
     default:
         break;
@@ -254,7 +254,7 @@ int main(int aArgc, char *aArgv[])
     ot::Mqttsn::MqttsnClient client = ot::Mqttsn::MqttsnClient(instance);
     sClient = &client;
     instance.GetNotifier().RegisterCallback(HandleNetifStateChanged, &instance);
-    sState = STATE_INITIALIZED;
+    sState = kInitialized;
 
     // Set default network settings
     ot::ThreadNetif &netif = instance.GetThreadNetif();
@@ -275,7 +275,7 @@ int main(int aArgc, char *aArgv[])
     SuccessOrExit(error = sClient->SetSearchGwCallback(SearchGatewayCallback, NULL));
     SuccessOrExit(error = sClient->SetAdvertiseCallback(AdvertiseCallback, NULL));
 #endif
-    sState = STATE_THREAD_STARTING;
+    sState = kThreadStarting;
     PRINTF("Thread starting.\r\n");
 
     while (true)

@@ -37508,290 +37508,290 @@ OUTPUT(openthread-mqttsn.axf elf32-littlearm)
  .debug_line    0x000760e0      0x115 c:/nxp/mcuxpressoide_10.2.1_795/ide/tools/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libcr_newlib_nohost.a(kill.o)
  .debug_line    0x000761f5       0x53 c:/nxp/mcuxpressoide_10.2.1_795/ide/tools/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libcr_newlib_nohost.a(_cr_check_heap.o)
 
-.debug_str      0x00000000    0xff39e
+.debug_str      0x00000000    0xff2ba
  .debug_str     0x00000000    0x9f136 ./utilities/fsl_debug_console.o
                               0x9f73b (size before relaxing)
  .debug_str     0x0009f136      0x9ad ./startup/startup_mkw41z4.o
                                0x35da (size before relaxing)
- .debug_str     0x0009fae3    0x166cc ./source/mqttsn_client.o
-                              0xb5502 (size before relaxing)
- .debug_str     0x000b61af      0x532 ./source/mtb.o
+ .debug_str     0x0009fae3    0x16616 ./source/mqttsn_client.o
+                              0xb545b (size before relaxing)
+ .debug_str     0x000b60f9      0x532 ./source/mtb.o
                                0x3308 (size before relaxing)
- .debug_str     0x000b66e1     0xf136 ./source/openthread-mqttsn.o
-                              0xc3eb1 (size before relaxing)
- .debug_str     0x000c5817       0x1f ./source/semihost_hardfault.o
+ .debug_str     0x000b662b     0xf108 ./source/openthread-mqttsn.o
+                              0xc3dd3 (size before relaxing)
+ .debug_str     0x000c5733       0x1f ./source/semihost_hardfault.o
                                0x2df5 (size before relaxing)
- .debug_str     0x000c5836      0x449 ./paho/MQTTSNPacket/src/MQTTSNConnectClient.o
+ .debug_str     0x000c5752      0x449 ./paho/MQTTSNPacket/src/MQTTSNConnectClient.o
                                0x7d57 (size before relaxing)
- .debug_str     0x000c5c7f      0x1b1 ./paho/MQTTSNPacket/src/MQTTSNConnectServer.o
+ .debug_str     0x000c5b9b      0x1b1 ./paho/MQTTSNPacket/src/MQTTSNConnectServer.o
                                0x7d10 (size before relaxing)
- .debug_str     0x000c5e30       0x9a ./paho/MQTTSNPacket/src/MQTTSNDeserializePublish.o
+ .debug_str     0x000c5d4c       0x9a ./paho/MQTTSNPacket/src/MQTTSNDeserializePublish.o
                                0x7ba5 (size before relaxing)
- .debug_str     0x000c5eca       0xef ./paho/MQTTSNPacket/src/MQTTSNPacket.o
+ .debug_str     0x000c5de6       0xef ./paho/MQTTSNPacket/src/MQTTSNPacket.o
                                0x7b96 (size before relaxing)
- .debug_str     0x000c5fb9       0x61 ./paho/MQTTSNPacket/src/MQTTSNSearchClient.o
+ .debug_str     0x000c5ed5       0x61 ./paho/MQTTSNPacket/src/MQTTSNSearchClient.o
                                0x7aca (size before relaxing)
- .debug_str     0x000c601a      0x104 ./paho/MQTTSNPacket/src/MQTTSNSerializePublish.o
+ .debug_str     0x000c5f36      0x104 ./paho/MQTTSNPacket/src/MQTTSNSerializePublish.o
                                0x7c7d (size before relaxing)
- .debug_str     0x000c611e       0x5d ./paho/MQTTSNPacket/src/MQTTSNSubscribeClient.o
+ .debug_str     0x000c603a       0x5d ./paho/MQTTSNPacket/src/MQTTSNSubscribeClient.o
                                0x7b99 (size before relaxing)
- .debug_str     0x000c617b       0x55 ./paho/MQTTSNPacket/src/MQTTSNUnsubscribeClient.o
+ .debug_str     0x000c6097       0x55 ./paho/MQTTSNPacket/src/MQTTSNUnsubscribeClient.o
                                0x7b8e (size before relaxing)
- .debug_str     0x000c61d0     0x1c82 ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_ant_config.o
+ .debug_str     0x000c60ec     0x1c82 ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_ant_config.o
                               0x9c307 (size before relaxing)
- .debug_str     0x000c7e52       0x51 ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_ble_config.o
+ .debug_str     0x000c7d6e       0x51 ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_ble_config.o
                               0x9c307 (size before relaxing)
- .debug_str     0x000c7ea3      0x6dd ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_common_config.o
+ .debug_str     0x000c7dbf      0x6dd ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_common_config.o
                               0x9c9a1 (size before relaxing)
- .debug_str     0x000c8580       0x5f ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_gfsk_bt_0p3_h_0p5_config.o
+ .debug_str     0x000c849c       0x5f ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_gfsk_bt_0p3_h_0p5_config.o
                               0x9c315 (size before relaxing)
- .debug_str     0x000c85df       0x60 ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_gfsk_bt_0p5_h_0p32_config.o
+ .debug_str     0x000c84fb       0x60 ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_gfsk_bt_0p5_h_0p32_config.o
                               0x9c316 (size before relaxing)
- .debug_str     0x000c863f       0x5f ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_gfsk_bt_0p5_h_0p5_config.o
+ .debug_str     0x000c855b       0x5f ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_gfsk_bt_0p5_h_0p5_config.o
                               0x9c315 (size before relaxing)
- .debug_str     0x000c869e       0x5f ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_gfsk_bt_0p5_h_0p7_config.o
+ .debug_str     0x000c85ba       0x5f ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_gfsk_bt_0p5_h_0p7_config.o
                               0x9c315 (size before relaxing)
- .debug_str     0x000c86fd       0x5f ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_gfsk_bt_0p5_h_1p0_config.o
+ .debug_str     0x000c8619       0x5f ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_gfsk_bt_0p5_h_1p0_config.o
                               0x9c315 (size before relaxing)
- .debug_str     0x000c875c       0x5f ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_gfsk_bt_0p7_h_0p5_config.o
+ .debug_str     0x000c8678       0x5f ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_gfsk_bt_0p7_h_0p5_config.o
                               0x9c315 (size before relaxing)
- .debug_str     0x000c87bb       0x5b ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_mode_datarate_config.o
+ .debug_str     0x000c86d7       0x5b ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_mode_datarate_config.o
                               0x9c311 (size before relaxing)
- .debug_str     0x000c8816       0x51 ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_msk_config.o
+ .debug_str     0x000c8732       0x51 ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_msk_config.o
                               0x9c307 (size before relaxing)
- .debug_str     0x000c8867       0x52 ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_zgbe_config.o
+ .debug_str     0x000c8783       0x52 ./openthread/third_party/nxp/MKW41Z4/XCVR/cfgs_kw4x_3x_2x/fsl_xcvr_zgbe_config.o
                               0x9c308 (size before relaxing)
- .debug_str     0x000c88b9     0x1ac3 ./openthread/third_party/nxp/MKW41Z4/XCVR/fsl_xcvr.o
+ .debug_str     0x000c87d5     0x1ac3 ./openthread/third_party/nxp/MKW41Z4/XCVR/fsl_xcvr.o
                               0xa264c (size before relaxing)
- .debug_str     0x000ca37c      0x68c ./openthread/third_party/nxp/MKW41Z4/XCVR/fsl_xcvr_trim.o
+ .debug_str     0x000ca298      0x68c ./openthread/third_party/nxp/MKW41Z4/XCVR/fsl_xcvr_trim.o
                               0xa1a02 (size before relaxing)
- .debug_str     0x000caa08      0x34e ./openthread/third_party/nxp/MKW41Z4/XCVR/ifr_radio.o
+ .debug_str     0x000ca924      0x34e ./openthread/third_party/nxp/MKW41Z4/XCVR/ifr_radio.o
                               0xa07b7 (size before relaxing)
- .debug_str     0x000cad56     0x291e ./openthread/third_party/mbedtls/repo/library/aes.o
+ .debug_str     0x000cac72     0x291e ./openthread/third_party/mbedtls/repo/library/aes.o
                                0xa95e (size before relaxing)
- .debug_str     0x000cd674      0xd76 ./openthread/third_party/mbedtls/repo/library/bignum.o
+ .debug_str     0x000cd590      0xd76 ./openthread/third_party/mbedtls/repo/library/bignum.o
                                0x9097 (size before relaxing)
- .debug_str     0x000ce3ea      0xeb7 ./openthread/third_party/mbedtls/repo/library/ccm.o
+ .debug_str     0x000ce306      0xeb7 ./openthread/third_party/mbedtls/repo/library/ccm.o
                                0x90ab (size before relaxing)
- .debug_str     0x000cf2a1      0x2ec ./openthread/third_party/mbedtls/repo/library/cipher.o
+ .debug_str     0x000cf1bd      0x2ec ./openthread/third_party/mbedtls/repo/library/cipher.o
                                0x9209 (size before relaxing)
- .debug_str     0x000cf58d      0x18a ./openthread/third_party/mbedtls/repo/library/cipher_wrap.o
+ .debug_str     0x000cf4a9      0x18a ./openthread/third_party/mbedtls/repo/library/cipher_wrap.o
                                0x9248 (size before relaxing)
- .debug_str     0x000cf717      0x22b ./openthread/third_party/mbedtls/repo/library/ctr_drbg.o
+ .debug_str     0x000cf633      0x22b ./openthread/third_party/mbedtls/repo/library/ctr_drbg.o
                                0x8654 (size before relaxing)
- .debug_str     0x000cf942      0x71e ./openthread/third_party/mbedtls/repo/library/ecjpake.o
+ .debug_str     0x000cf85e      0x71e ./openthread/third_party/mbedtls/repo/library/ecjpake.o
                                0x8e5e (size before relaxing)
- .debug_str     0x000d0060      0x6b0 ./openthread/third_party/mbedtls/repo/library/ecp.o
+ .debug_str     0x000cff7c      0x6b0 ./openthread/third_party/mbedtls/repo/library/ecp.o
                                0x9247 (size before relaxing)
- .debug_str     0x000d0710      0x6b6 ./openthread/third_party/mbedtls/repo/library/ecp_curves.o
+ .debug_str     0x000d062c      0x6b6 ./openthread/third_party/mbedtls/repo/library/ecp_curves.o
                                0x8dec (size before relaxing)
- .debug_str     0x000d0dc6      0x265 ./openthread/third_party/mbedtls/repo/library/entropy.o
+ .debug_str     0x000d0ce2      0x265 ./openthread/third_party/mbedtls/repo/library/entropy.o
                                0x8545 (size before relaxing)
- .debug_str     0x000d102b      0x26d ./openthread/third_party/mbedtls/repo/library/md.o
+ .debug_str     0x000d0f47      0x26d ./openthread/third_party/mbedtls/repo/library/md.o
                                0x8546 (size before relaxing)
- .debug_str     0x000d1298      0x119 ./openthread/third_party/mbedtls/repo/library/md_wrap.o
+ .debug_str     0x000d11b4      0x119 ./openthread/third_party/mbedtls/repo/library/md_wrap.o
                                0x84cc (size before relaxing)
- .debug_str     0x000d13b1      0x133 ./openthread/third_party/mbedtls/repo/library/platform.o
+ .debug_str     0x000d12cd      0x133 ./openthread/third_party/mbedtls/repo/library/platform.o
                                0x8196 (size before relaxing)
- .debug_str     0x000d14e4       0x4b ./openthread/third_party/mbedtls/repo/library/platform_util.o
+ .debug_str     0x000d1400       0x4b ./openthread/third_party/mbedtls/repo/library/platform_util.o
                                0x7fd0 (size before relaxing)
- .debug_str     0x000d152f      0x439 ./openthread/third_party/mbedtls/repo/library/sha256.o
+ .debug_str     0x000d144b      0x439 ./openthread/third_party/mbedtls/repo/library/sha256.o
                                0x8569 (size before relaxing)
- .debug_str     0x000d1968      0x3d9 ./openthread/third_party/mbedtls/repo/library/ssl_ciphersuites.o
+ .debug_str     0x000d1884      0x3d9 ./openthread/third_party/mbedtls/repo/library/ssl_ciphersuites.o
                                0xdcaa (size before relaxing)
- .debug_str     0x000d1d41     0x1448 ./openthread/third_party/mbedtls/repo/library/ssl_cli.o
+ .debug_str     0x000d1c5d     0x1448 ./openthread/third_party/mbedtls/repo/library/ssl_cli.o
                                0xf6c9 (size before relaxing)
- .debug_str     0x000d3189      0xfa5 ./openthread/third_party/mbedtls/repo/library/ssl_tls.o
+ .debug_str     0x000d30a5      0xfa5 ./openthread/third_party/mbedtls/repo/library/ssl_tls.o
                               0x10601 (size before relaxing)
- .debug_str     0x000d412e      0x128 ./openthread/src/core/utils/heap.o
+ .debug_str     0x000d404a      0x128 ./openthread/src/core/utils/heap.o
                                0xb19b (size before relaxing)
- .debug_str     0x000d4256      0x485 ./openthread/src/core/utils/slaac_address.o
+ .debug_str     0x000d4172      0x485 ./openthread/src/core/utils/slaac_address.o
                               0x1bbca (size before relaxing)
- .debug_str     0x000d46db     0x7147 ./openthread/src/core/thread/address_resolver.o
+ .debug_str     0x000d45f7     0x7147 ./openthread/src/core/thread/address_resolver.o
                               0x2d472 (size before relaxing)
- .debug_str     0x000db822      0xbac ./openthread/src/core/thread/announce_begin_server.o
+ .debug_str     0x000db73e      0xbac ./openthread/src/core/thread/announce_begin_server.o
                               0x21023 (size before relaxing)
- .debug_str     0x000dc3ce      0x17d ./openthread/src/core/thread/announce_sender.o
+ .debug_str     0x000dc2ea      0x17d ./openthread/src/core/thread/announce_sender.o
                               0x2900f (size before relaxing)
- .debug_str     0x000dc54b      0x17a ./openthread/src/core/thread/child_table.o
+ .debug_str     0x000dc467      0x17a ./openthread/src/core/thread/child_table.o
                               0x25497 (size before relaxing)
- .debug_str     0x000dc6c5      0x6ab ./openthread/src/core/thread/data_poll_manager.o
+ .debug_str     0x000dc5e1      0x6ab ./openthread/src/core/thread/data_poll_manager.o
                               0x2dc9a (size before relaxing)
- .debug_str     0x000dcd70     0x2dbc ./openthread/src/core/thread/energy_scan_server.o
+ .debug_str     0x000dcc8c     0x2dbc ./openthread/src/core/thread/energy_scan_server.o
                               0x2f802 (size before relaxing)
- .debug_str     0x000dfb2c      0x3a5 ./openthread/src/core/thread/key_manager.o
+ .debug_str     0x000dfa48      0x3a5 ./openthread/src/core/thread/key_manager.o
                               0x263c4 (size before relaxing)
- .debug_str     0x000dfed1      0x3fa ./openthread/src/core/thread/link_quality.o
+ .debug_str     0x000dfded      0x3fa ./openthread/src/core/thread/link_quality.o
                               0x149f8 (size before relaxing)
- .debug_str     0x000e02cb     0x10e4 ./openthread/src/core/thread/lowpan.o
+ .debug_str     0x000e01e7     0x10e4 ./openthread/src/core/thread/lowpan.o
                               0x201d5 (size before relaxing)
- .debug_str     0x000e13af      0xc05 ./openthread/src/core/thread/mesh_forwarder.o
+ .debug_str     0x000e12cb      0xc05 ./openthread/src/core/thread/mesh_forwarder.o
                               0x2f8c5 (size before relaxing)
- .debug_str     0x000e1fb4      0x43d ./openthread/src/core/thread/mesh_forwarder_ftd.o
+ .debug_str     0x000e1ed0      0x43d ./openthread/src/core/thread/mesh_forwarder_ftd.o
                               0x327e8 (size before relaxing)
- .debug_str     0x000e23f1     0x238b ./openthread/src/core/thread/mle.o
+ .debug_str     0x000e230d     0x238b ./openthread/src/core/thread/mle.o
                               0x358ff (size before relaxing)
- .debug_str     0x000e477c     0x1785 ./openthread/src/core/thread/mle_router.o
+ .debug_str     0x000e4698     0x1785 ./openthread/src/core/thread/mle_router.o
                               0x36839 (size before relaxing)
- .debug_str     0x000e5f01      0x5a3 ./openthread/src/core/thread/network_data.o
+ .debug_str     0x000e5e1d      0x5a3 ./openthread/src/core/thread/network_data.o
                               0x2ad66 (size before relaxing)
- .debug_str     0x000e64a4      0x146 ./openthread/src/core/thread/network_data_leader.o
+ .debug_str     0x000e63c0      0x146 ./openthread/src/core/thread/network_data_leader.o
                               0x2af03 (size before relaxing)
- .debug_str     0x000e65ea      0x4a2 ./openthread/src/core/thread/network_data_leader_ftd.o
+ .debug_str     0x000e6506      0x4a2 ./openthread/src/core/thread/network_data_leader_ftd.o
                               0x2c521 (size before relaxing)
- .debug_str     0x000e6a8c     0x2895 ./openthread/src/core/thread/network_diagnostic.o
+ .debug_str     0x000e69a8     0x2895 ./openthread/src/core/thread/network_diagnostic.o
                               0x30b12 (size before relaxing)
- .debug_str     0x000e9321      0x432 ./openthread/src/core/thread/panid_query_server.o
+ .debug_str     0x000e923d      0x432 ./openthread/src/core/thread/panid_query_server.o
                               0x2c945 (size before relaxing)
- .debug_str     0x000e9753      0x130 ./openthread/src/core/thread/router_table.o
+ .debug_str     0x000e966f      0x130 ./openthread/src/core/thread/router_table.o
                               0x2efe4 (size before relaxing)
- .debug_str     0x000e9883      0x188 ./openthread/src/core/thread/src_match_controller.o
+ .debug_str     0x000e979f      0x188 ./openthread/src/core/thread/src_match_controller.o
                               0x2100b (size before relaxing)
- .debug_str     0x000e9a0b     0x31bd ./openthread/src/core/thread/thread_netif.o
+ .debug_str     0x000e9927     0x31bd ./openthread/src/core/thread/thread_netif.o
                               0x3787d (size before relaxing)
- .debug_str     0x000ecbc8       0x67 ./openthread/src/core/thread/topology.o
+ .debug_str     0x000ecae4       0x67 ./openthread/src/core/thread/topology.o
                               0x289b8 (size before relaxing)
- .debug_str     0x000ecc2f       0xca ./openthread/src/core/net/icmp6.o
+ .debug_str     0x000ecb4b       0xca ./openthread/src/core/net/icmp6.o
                               0x1ede5 (size before relaxing)
- .debug_str     0x000eccf9      0x5b3 ./openthread/src/core/net/ip6.o
+ .debug_str     0x000ecc15      0x5b3 ./openthread/src/core/net/ip6.o
                               0x2cdb9 (size before relaxing)
- .debug_str     0x000ed2ac       0x9d ./openthread/src/core/net/ip6_address.o
+ .debug_str     0x000ed1c8       0x9d ./openthread/src/core/net/ip6_address.o
                               0x14d40 (size before relaxing)
- .debug_str     0x000ed349      0x223 ./openthread/src/core/net/ip6_filter.o
+ .debug_str     0x000ed265      0x223 ./openthread/src/core/net/ip6_filter.o
                               0x1bc8a (size before relaxing)
- .debug_str     0x000ed56c       0x2b ./openthread/src/core/net/ip6_headers.o
+ .debug_str     0x000ed488       0x2b ./openthread/src/core/net/ip6_headers.o
                               0x12ae9 (size before relaxing)
- .debug_str     0x000ed597      0x711 ./openthread/src/core/net/ip6_mpl.o
+ .debug_str     0x000ed4b3      0x711 ./openthread/src/core/net/ip6_mpl.o
                               0x1bfd7 (size before relaxing)
- .debug_str     0x000edca8       0x68 ./openthread/src/core/net/ip6_routes.o
+ .debug_str     0x000edbc4       0x68 ./openthread/src/core/net/ip6_routes.o
                               0x1b653 (size before relaxing)
- .debug_str     0x000edd10      0x304 ./openthread/src/core/net/netif.o
+ .debug_str     0x000edc2c      0x304 ./openthread/src/core/net/netif.o
                               0x1e5a3 (size before relaxing)
- .debug_str     0x000ee014       0xd3 ./openthread/src/core/net/udp6.o
+ .debug_str     0x000edf30       0xd3 ./openthread/src/core/net/udp6.o
                               0x1b907 (size before relaxing)
- .debug_str     0x000ee0e7      0x780 ./openthread/src/core/meshcop/dataset.o
+ .debug_str     0x000ee003      0x780 ./openthread/src/core/meshcop/dataset.o
                               0x2cede (size before relaxing)
- .debug_str     0x000ee867       0x9c ./openthread/src/core/meshcop/dataset_local.o
+ .debug_str     0x000ee783       0x9c ./openthread/src/core/meshcop/dataset_local.o
                               0x1f0df (size before relaxing)
- .debug_str     0x000ee903      0x2cd ./openthread/src/core/meshcop/dataset_manager.o
+ .debug_str     0x000ee81f      0x2cd ./openthread/src/core/meshcop/dataset_manager.o
                               0x2db13 (size before relaxing)
- .debug_str     0x000eebd0      0x2a8 ./openthread/src/core/meshcop/dataset_manager_ftd.o
+ .debug_str     0x000eeaec      0x2a8 ./openthread/src/core/meshcop/dataset_manager_ftd.o
                               0x31bd5 (size before relaxing)
- .debug_str     0x000eee78      0x228 ./openthread/src/core/meshcop/dtls.o
+ .debug_str     0x000eed94      0x228 ./openthread/src/core/meshcop/dtls.o
                               0x21111 (size before relaxing)
- .debug_str     0x000ef0a0      0xc47 ./openthread/src/core/meshcop/joiner.o
+ .debug_str     0x000eefbc      0xc47 ./openthread/src/core/meshcop/joiner.o
                               0x2ea1c (size before relaxing)
- .debug_str     0x000efce7      0x6f6 ./openthread/src/core/meshcop/joiner_router.o
+ .debug_str     0x000efc03      0x6f6 ./openthread/src/core/meshcop/joiner_router.o
                               0x31fdf (size before relaxing)
- .debug_str     0x000f03dd      0x1b8 ./openthread/src/core/meshcop/leader.o
+ .debug_str     0x000f02f9      0x1b8 ./openthread/src/core/meshcop/leader.o
                               0x2c6bd (size before relaxing)
- .debug_str     0x000f0595       0x32 ./openthread/src/core/meshcop/meshcop.o
+ .debug_str     0x000f04b1       0x32 ./openthread/src/core/meshcop/meshcop.o
                               0x1d4bf (size before relaxing)
- .debug_str     0x000f05c7       0x53 ./openthread/src/core/meshcop/meshcop_tlvs.o
+ .debug_str     0x000f04e3       0x53 ./openthread/src/core/meshcop/meshcop_tlvs.o
                               0x1006a (size before relaxing)
- .debug_str     0x000f061a       0x5f ./openthread/src/core/meshcop/timestamp.o
+ .debug_str     0x000f0536       0x5f ./openthread/src/core/meshcop/timestamp.o
                                0x9efe (size before relaxing)
- .debug_str     0x000f0679      0x177 ./openthread/src/core/mac/channel_mask.o
+ .debug_str     0x000f0595      0x177 ./openthread/src/core/mac/channel_mask.o
                                0xd156 (size before relaxing)
- .debug_str     0x000f07f0      0x617 ./openthread/src/core/mac/mac.o
+ .debug_str     0x000f070c      0x617 ./openthread/src/core/mac/mac.o
                               0x2f7c6 (size before relaxing)
- .debug_str     0x000f0e07      0x4e6 ./openthread/src/core/mac/mac_frame.o
+ .debug_str     0x000f0d23      0x4e6 ./openthread/src/core/mac/mac_frame.o
                               0x161da (size before relaxing)
- .debug_str     0x000f12ed       0xca ./openthread/src/core/crypto/aes_ccm.o
+ .debug_str     0x000f1209       0xca ./openthread/src/core/crypto/aes_ccm.o
                                0xd7d5 (size before relaxing)
- .debug_str     0x000f13b7       0x63 ./openthread/src/core/crypto/aes_ecb.o
+ .debug_str     0x000f12d3       0x63 ./openthread/src/core/crypto/aes_ecb.o
                                0xbc7f (size before relaxing)
- .debug_str     0x000f141a       0x77 ./openthread/src/core/crypto/hmac_sha256.o
+ .debug_str     0x000f1336       0x77 ./openthread/src/core/crypto/hmac_sha256.o
                                0xbd20 (size before relaxing)
- .debug_str     0x000f1491       0x44 ./openthread/src/core/crypto/mbedtls.o
+ .debug_str     0x000f13ad       0x44 ./openthread/src/core/crypto/mbedtls.o
                               0x1b62d (size before relaxing)
- .debug_str     0x000f14d5       0x5b ./openthread/src/core/crypto/sha256.o
+ .debug_str     0x000f13f1       0x5b ./openthread/src/core/crypto/sha256.o
                                0xbc13 (size before relaxing)
- .debug_str     0x000f1530       0x5b ./openthread/src/core/common/crc16.o
+ .debug_str     0x000f144c       0x5b ./openthread/src/core/common/crc16.o
                                0x6712 (size before relaxing)
- .debug_str     0x000f158b      0x191 ./openthread/src/core/common/instance.o
+ .debug_str     0x000f14a7      0x191 ./openthread/src/core/common/instance.o
                               0x289dc (size before relaxing)
- .debug_str     0x000f171c       0x41 ./openthread/src/core/common/locator.o
+ .debug_str     0x000f1638       0x41 ./openthread/src/core/common/locator.o
                               0x1b540 (size before relaxing)
- .debug_str     0x000f175d      0x269 ./openthread/src/core/common/message.o
+ .debug_str     0x000f1679      0x269 ./openthread/src/core/common/message.o
                               0x23ad0 (size before relaxing)
- .debug_str     0x000f19c6      0x11d ./openthread/src/core/common/notifier.o
+ .debug_str     0x000f18e2      0x11d ./openthread/src/core/common/notifier.o
                               0x1eddf (size before relaxing)
- .debug_str     0x000f1ae3      0x153 ./openthread/src/core/common/settings.o
+ .debug_str     0x000f19ff      0x153 ./openthread/src/core/common/settings.o
                               0x1efc2 (size before relaxing)
- .debug_str     0x000f1c36       0x39 ./openthread/src/core/common/string.o
+ .debug_str     0x000f1b52       0x39 ./openthread/src/core/common/string.o
                                0xb10c (size before relaxing)
- .debug_str     0x000f1c6f       0xd9 ./openthread/src/core/common/tasklet.o
+ .debug_str     0x000f1b8b       0xd9 ./openthread/src/core/common/tasklet.o
                               0x1b649 (size before relaxing)
- .debug_str     0x000f1d48       0xce ./openthread/src/core/common/timer.o
+ .debug_str     0x000f1c64       0xce ./openthread/src/core/common/timer.o
                               0x1ecf3 (size before relaxing)
- .debug_str     0x000f1e16       0x27 ./openthread/src/core/common/tlvs.o
+ .debug_str     0x000f1d32       0x27 ./openthread/src/core/common/tlvs.o
                                0xed57 (size before relaxing)
- .debug_str     0x000f1e3d       0xc2 ./openthread/src/core/common/trickle_timer.o
+ .debug_str     0x000f1d59       0xc2 ./openthread/src/core/common/trickle_timer.o
                                0xd72e (size before relaxing)
- .debug_str     0x000f1eff     0x1781 ./openthread/src/core/coap/coap.o
+ .debug_str     0x000f1e1b     0x1781 ./openthread/src/core/coap/coap.o
                               0x21b4b (size before relaxing)
- .debug_str     0x000f3680       0xdd ./openthread/src/core/coap/coap_header.o
+ .debug_str     0x000f359c       0xdd ./openthread/src/core/coap/coap_header.o
                               0x1c6b2 (size before relaxing)
- .debug_str     0x000f375d      0xaa4 ./openthread/src/core/coap/coap_secure.o
+ .debug_str     0x000f3679      0xaa4 ./openthread/src/core/coap/coap_secure.o
                               0x228d1 (size before relaxing)
- .debug_str     0x000f4201      0x17b ./openthread/src/core/api/instance_api.o
+ .debug_str     0x000f411d      0x17b ./openthread/src/core/api/instance_api.o
                               0x1edc3 (size before relaxing)
- .debug_str     0x000f437c      0x2f9 ./openthread/src/core/api/ip6_api.o
+ .debug_str     0x000f4298      0x2f9 ./openthread/src/core/api/ip6_api.o
                               0x23370 (size before relaxing)
- .debug_str     0x000f4675      0x258 ./openthread/src/core/api/link_api.o
+ .debug_str     0x000f4591      0x258 ./openthread/src/core/api/link_api.o
                               0x2b4be (size before relaxing)
- .debug_str     0x000f48cd       0x7c ./openthread/src/core/api/netdata_api.o
+ .debug_str     0x000f47e9       0x7c ./openthread/src/core/api/netdata_api.o
                               0x27b00 (size before relaxing)
- .debug_str     0x000f4949       0x6d ./openthread/src/core/api/tasklet_api.o
+ .debug_str     0x000f4865       0x6d ./openthread/src/core/api/tasklet_api.o
                               0x1ec9a (size before relaxing)
- .debug_str     0x000f49b6      0x4fd ./openthread/src/core/api/thread_api.o
+ .debug_str     0x000f48d2      0x4fd ./openthread/src/core/api/thread_api.o
                               0x30ab3 (size before relaxing)
- .debug_str     0x000f4eb3      0x3f8 ./openthread/examples/platforms/utils/settings_flash.o
+ .debug_str     0x000f4dcf      0x3f8 ./openthread/examples/platforms/utils/settings_flash.o
                                0x9f58 (size before relaxing)
- .debug_str     0x000f52ab      0x462 ./openthread/examples/platforms/kw41z/alarm.o
+ .debug_str     0x000f51c7      0x462 ./openthread/examples/platforms/kw41z/alarm.o
                               0x9ee49 (size before relaxing)
- .debug_str     0x000f570d      0x69f ./openthread/examples/platforms/kw41z/flash.o
+ .debug_str     0x000f5629      0x69f ./openthread/examples/platforms/kw41z/flash.o
                               0x9f552 (size before relaxing)
- .debug_str     0x000f5dac      0x207 ./openthread/examples/platforms/kw41z/misc.o
+ .debug_str     0x000f5cc8      0x207 ./openthread/examples/platforms/kw41z/misc.o
                               0x9dce9 (size before relaxing)
- .debug_str     0x000f5fb3      0x886 ./openthread/examples/platforms/kw41z/radio.o
+ .debug_str     0x000f5ecf      0x886 ./openthread/examples/platforms/kw41z/radio.o
                               0xa12c7 (size before relaxing)
- .debug_str     0x000f6839      0x456 ./openthread/examples/platforms/kw41z/random.o
+ .debug_str     0x000f6755      0x456 ./openthread/examples/platforms/kw41z/random.o
                               0x9eba9 (size before relaxing)
- .debug_str     0x000f6c8f      0x3ee ./openthread/examples/platforms/kw41z/system.o
+ .debug_str     0x000f6bab      0x3ee ./openthread/examples/platforms/kw41z/system.o
                               0xa1701 (size before relaxing)
- .debug_str     0x000f707d      0x4a2 ./openthread/examples/platforms/kw41z/uart.o
+ .debug_str     0x000f6f99      0x4a2 ./openthread/examples/platforms/kw41z/uart.o
                               0x9f77c (size before relaxing)
- .debug_str     0x000f751f     0x1272 ./drivers/fsl_clock.o
+ .debug_str     0x000f743b     0x1272 ./drivers/fsl_clock.o
                               0x9f8fb (size before relaxing)
- .debug_str     0x000f8791       0x9f ./drivers/fsl_common.o
+ .debug_str     0x000f86ad       0x9f ./drivers/fsl_common.o
                               0x9e541 (size before relaxing)
- .debug_str     0x000f8830      0xd99 ./drivers/fsl_edma.o
+ .debug_str     0x000f874c      0xd99 ./drivers/fsl_edma.o
                               0x9f3cf (size before relaxing)
- .debug_str     0x000f95c9     0x1f7b ./drivers/fsl_flash.o
+ .debug_str     0x000f94e5     0x1f7b ./drivers/fsl_flash.o
                               0xa0da4 (size before relaxing)
- .debug_str     0x000fb544      0x609 ./drivers/fsl_lpuart.o
+ .debug_str     0x000fb460      0x609 ./drivers/fsl_lpuart.o
                               0x9f597 (size before relaxing)
- .debug_str     0x000fbb4d       0x6f ./drivers/fsl_pit.o
+ .debug_str     0x000fba69       0x6f ./drivers/fsl_pit.o
                               0x9e360 (size before relaxing)
- .debug_str     0x000fbbbc     0x32f2 ./drivers/fsl_trng.o
+ .debug_str     0x000fbad8     0x32f2 ./drivers/fsl_trng.o
                               0xa1a54 (size before relaxing)
- .debug_str     0x000feeae       0x20 ./board/board.o
+ .debug_str     0x000fedca       0x20 ./board/board.o
                               0x9ec6a (size before relaxing)
- .debug_str     0x000feece      0x290 ./board/clock_config.o
+ .debug_str     0x000fedea      0x290 ./board/clock_config.o
                               0x9e945 (size before relaxing)
- .debug_str     0x000ff15e       0x44 ./CMSIS/system_MKW41Z4.o
+ .debug_str     0x000ff07a       0x44 ./CMSIS/system_MKW41Z4.o
                               0x9a77f (size before relaxing)
- .debug_str     0x000ff1a2      0x196 c:/nxp/mcuxpressoide_10.2.1_795/ide/tools/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libcr_newlib_nohost.a(_cr_sbrk.o)
+ .debug_str     0x000ff0be      0x196 c:/nxp/mcuxpressoide_10.2.1_795/ide/tools/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libcr_newlib_nohost.a(_cr_sbrk.o)
                                 0x60e (size before relaxing)
- .debug_str     0x000ff338       0x15 c:/nxp/mcuxpressoide_10.2.1_795/ide/tools/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libcr_newlib_nohost.a(_exit.o)
+ .debug_str     0x000ff254       0x15 c:/nxp/mcuxpressoide_10.2.1_795/ide/tools/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libcr_newlib_nohost.a(_exit.o)
                                 0x1ae (size before relaxing)
- .debug_str     0x000ff34d       0x18 c:/nxp/mcuxpressoide_10.2.1_795/ide/tools/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libcr_newlib_nohost.a(getpid.o)
+ .debug_str     0x000ff269       0x18 c:/nxp/mcuxpressoide_10.2.1_795/ide/tools/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libcr_newlib_nohost.a(getpid.o)
                                 0x5af (size before relaxing)
- .debug_str     0x000ff365       0x14 c:/nxp/mcuxpressoide_10.2.1_795/ide/tools/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libcr_newlib_nohost.a(kill.o)
+ .debug_str     0x000ff281       0x14 c:/nxp/mcuxpressoide_10.2.1_795/ide/tools/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libcr_newlib_nohost.a(kill.o)
                                 0x5ab (size before relaxing)
- .debug_str     0x000ff379       0x25 c:/nxp/mcuxpressoide_10.2.1_795/ide/tools/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libcr_newlib_nohost.a(_cr_check_heap.o)
+ .debug_str     0x000ff295       0x25 c:/nxp/mcuxpressoide_10.2.1_795/ide/tools/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libcr_newlib_nohost.a(_cr_check_heap.o)
                                 0x166 (size before relaxing)
 
 .comment        0x00000000       0x7e
