@@ -1,8 +1,6 @@
 #ifndef MQTTSN_CLIENT_HPP_
 #define MQTTSN_CLIENT_HPP_
 
-#include <string>
-
 #include "common/locator.hpp"
 #include "common/instance.hpp"
 #include "net/ip6_address.hpp"
@@ -19,7 +17,7 @@ enum ReturnCode
     MQTTSN_CODE_REJECTED_CONGESTION = 1,
     MQTTSN_CODE_REJECTED_TOPIC_ID = 2,
     MQTTSN_CODE_REJECTED_NOT_SUPPORTED = 3,
-    MQTTSN_CODE_TIMEOUT = 4,
+    MQTTSN_CODE_TIMEOUT = -1,
 };
 
 enum Qos
@@ -109,6 +107,13 @@ private:
 class MqttsnConfig
 {
 public:
+    enum
+    {
+        kCliendIdStringMax = 24
+    };
+
+    typedef String<kCliendIdStringMax> ClientIdString;
+
     MqttsnConfig(void)
         : mAddress()
         , mPort()
@@ -140,14 +145,14 @@ public:
         mPort = aPort;
     }
 
-    const std::string &GetClientId()
+    const ClientIdString &GetClientId()
     {
         return mClientId;
     }
 
-    void SetClientId(const std::string &aClientId)
+    void SetClientId(const char* aClientId)
     {
-        mClientId = aClientId;
+        mClientId.Set("%s", aClientId);
     }
 
     int16_t GetKeepAlive()
@@ -183,7 +188,7 @@ public:
 private:
     Ip6::Address mAddress;
     uint16_t mPort;
-    std::string mClientId;
+    ClientIdString mClientId;
     uint16_t mKeepAlive;
     bool mCleanSession;
     uint32_t mGatewayTimeout;
@@ -192,6 +197,7 @@ private:
 class MqttsnClient: public InstanceLocator
 {
 public:
+
     typedef void (*ConnectCallbackFunc)(ReturnCode aCode, void* aContext);
 
     typedef void (*SubscribeCallbackFunc)(ReturnCode aCode, TopicId topicId, void* aContext);
@@ -223,9 +229,9 @@ public:
     otError Connect(MqttsnConfig &aConfig);
 
     // TODO: Overload for other topic types
-    otError Subscribe(const std::string &aTopic, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext);
+    otError Subscribe(const char* aTopicName, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext);
 
-    otError Register(const std::string &aTopic, RegisterCallbackFunc aCallback, void* aContext);
+    otError Register(const char* aTopicName, RegisterCallbackFunc aCallback, void* aContext);
 
     otError Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, TopicId aTopicId);
 

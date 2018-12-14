@@ -628,7 +628,7 @@ otError MqttsnClient::Connect(MqttsnConfig &aConfig)
     mConfig = aConfig;
 
     MQTTSNString clientId;
-    clientId.cstring = const_cast<char *>(aConfig.GetClientId().c_str());
+    clientId.cstring = const_cast<char *>(aConfig.GetClientId().AsCString());
     options.clientID = clientId;
     options.duration = aConfig.GetKeepAlive();
     options.cleansession = static_cast<unsigned char>(aConfig.GetCleanSession());
@@ -652,7 +652,7 @@ exit:
     return error;
 }
 
-otError MqttsnClient::Subscribe(const std::string &aTopic, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext)
+otError MqttsnClient::Subscribe(const char* aTopicName, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext)
 {
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
@@ -675,8 +675,8 @@ otError MqttsnClient::Subscribe(const std::string &aTopic, Qos aQos, SubscribeCa
     }
 
     topicIdConfig.type = MQTTSN_TOPIC_TYPE_NORMAL;
-    topicIdConfig.data.long_.name = const_cast<char *>(aTopic.c_str());
-    topicIdConfig.data.long_.len = aTopic.length();
+    topicIdConfig.data.long_.name = const_cast<char*>(aTopicName);
+    topicIdConfig.data.long_.len = strlen(aTopicName);
 
     length = MQTTSNSerialize_subscribe(buffer, MAX_PACKET_SIZE, 0, static_cast<int>(aQos), mPacketId, &topicIdConfig);
     if (length <= 0)
@@ -695,7 +695,7 @@ exit:
     return error;
 }
 
-otError MqttsnClient::Register(const std::string &aTopic, RegisterCallbackFunc aCallback, void* aContext)
+otError MqttsnClient::Register(const char* aTopicName, RegisterCallbackFunc aCallback, void* aContext)
 {
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
@@ -709,7 +709,7 @@ otError MqttsnClient::Register(const std::string &aTopic, RegisterCallbackFunc a
         goto exit;
     }
 
-    topicName.cstring = const_cast<char *>(aTopic.c_str());
+    topicName.cstring = const_cast<char*>(aTopicName);
     length = MQTTSNSerialize_register(buffer, MAX_PACKET_SIZE, 0, mPacketId, &topicName);
     if (length <= 0)
     {
@@ -1009,7 +1009,7 @@ otError MqttsnClient::PingGateway()
     }
 
     MQTTSNString clientId;
-    clientId.cstring = const_cast<char *>(mConfig.GetClientId().c_str());
+    clientId.cstring = const_cast<char *>(mConfig.GetClientId().AsCString());
     length = MQTTSNSerialize_pingreq(buffer, MAX_PACKET_SIZE, clientId);
 
     if (length <= 0)

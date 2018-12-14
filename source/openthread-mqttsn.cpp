@@ -123,9 +123,6 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::To
     {
         PRINTF("Successfully subscribed to topic: %d.\r\n", aTopicId);
         sState = STATE_MQTT_RUNNING;
-
-        std::string data = "hello";
-        sClient->Publish(reinterpret_cast<const uint8_t *>(data.c_str()), data.length(), ot::Mqttsn::Qos::MQTTSN_QOS0, aTopicId);
     }
     else
     {
@@ -162,13 +159,13 @@ static void AdvertiseCallback(const ot::Ip6::Address &aAddress, uint16_t aPort, 
     sState = STATE_MQTT_CONNECTING;
 }
 
-static void SearchGateway(const std::string &aMulticastAddress, uint16_t aPort)
+static void SearchGateway(const char* aMulticastAddress, uint16_t aPort)
 {
     OT_UNUSED_VARIABLE(aContext);
 
     otError error = OT_ERROR_NONE;
     ot::Ip6::Address address;
-    address.FromString(aMulticastAddress.c_str());
+    address.FromString(aMulticastAddress);
     if ((error = sClient->SearchGateway(address, aPort, GATEWAY_MULTICAST_RADIUS)) == OT_ERROR_NONE)
     {
         sSearchGwTimeoutTime = ot::TimerMilli::GetNow() + SEND_TIMEOUT;
