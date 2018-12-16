@@ -160,6 +160,7 @@ MqttsnClient::MqttsnClient(Instance& instance)
     , mGwTimeout(0)
     , mDisconnectRequested(false)
     , mSleepRequested(false)
+    , mTimeoutRaised(false)
     , mClientState(kStateDisconnected)
     , mSubscribeQueue(HandleSubscribeTimeout, this)
     , mRegisterQueue(HandleRegisterTimeout, this)
@@ -601,20 +602,26 @@ otError MqttsnClient::Process()
     // Handle timeout
     if (mGwTimeout != 0 && mGwTimeout <= now)
     {
-        OnDisconnected();
+        mTimeoutRaised = true;
+        goto exit;
+    }
+
+    // Handle pending messages timeouts
+    SuccessOrExit(error = mSubscribeQueue.HandleTimer());
+    SuccessOrExit(error = mRegisterQueue.HandleTimer());
+    SuccessOrExit(error = mUnsubscribeQueue.HandleTimer());
+
+exit:
+    if (mTimeoutRaised)
+    {
         mClientState = kStateLost;
+        OnDisconnected();
         if (mDisconnectedCallback)
         {
             mDisconnectedCallback(kTimeout, mDisconnectedContext);
         }
     }
 
-    // Handle pending messages timeouts
-    mSubscribeQueue.HandleTimer();
-    mRegisterQueue.HandleTimer();
-    mUnsubscribeQueue.HandleTimer();
-
-exit:
     return error;
 }
 
@@ -1034,6 +1041,7 @@ void MqttsnClient::OnDisconnected()
 {
     mDisconnectRequested = false;
     mSleepRequested = false;
+    mTimeoutRaised = false;
     mGwTimeout = 0;
     mPingReqTime = 0;
 
@@ -1052,6 +1060,8 @@ void MqttsnClient::HandleSubscribeTimeout(const MessageMetadata<SubscribeCallbac
 {
     OT_UNUSED_VARIABLE(aContext);
 
+    MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
+    client->mTimeoutRaised = true;
     aMetadata.mCallback(kCodeTimeout, 0, aMetadata.mContext);
 }
 
@@ -1059,6 +1069,8 @@ void MqttsnClient::HandleRegisterTimeout(const MessageMetadata<RegisterCallbackF
 {
     OT_UNUSED_VARIABLE(aContext);
 
+    MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
+    client->mTimeoutRaised = true;
     aMetadata.mCallback(kCodeTimeout, 0, aMetadata.mContext);
 }
 
@@ -1066,6 +1078,8 @@ void MqttsnClient::HandleUnsubscribeTimeout(const MessageMetadata<UnsubscribeCal
 {
     OT_UNUSED_VARIABLE(aContext);
 
+    MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
+    client->mTimeoutRaised = true;
     aMetadata.mCallback(kCodeTimeout, aMetadata.mContext);
 }
 

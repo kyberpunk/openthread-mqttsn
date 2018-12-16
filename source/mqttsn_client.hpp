@@ -289,6 +289,7 @@ private:
     uint32_t mGwTimeout;
     bool mDisconnectRequested;
     bool mSleepRequested;
+    bool mTimeoutRaised;
     ClientState mClientState;
     WaitingMessagesQueue<SubscribeCallbackFunc> mSubscribeQueue;
     WaitingMessagesQueue<RegisterCallbackFunc> mRegisterQueue;
