@@ -24,15 +24,15 @@
 #define GATEWAY_ADDRESS "2018:ff9b::ac12:8"
 
 #define GATEWAY_SEARCH 1
-#define GATEWAY_MULTICAST_PORT 1883
-#define GATEWAY_MULTICAST_ADDRESS "2018:ff9b::e101:101"
-#define GATEWAY_MULTICAST_RADIUS 4
+#define GATEWAY_MULTICAST_PORT 10000
+#define GATEWAY_MULTICAST_ADDRESS "ff03::2"
+#define GATEWAY_MULTICAST_RADIUS 8
 
 #define DEFAULT_TOPIC "test"
 #define SEND_TIMEOUT 3000
 
 #define CLIENT_ID "THREAD"
-#define CLIENT_PORT 11111
+#define CLIENT_PORT 10000
 
 enum ApplicationState
 {
@@ -52,7 +52,6 @@ static uint32_t sConnectionTimeoutTime = 0;
 static otNetifAddress sSlaacAddresses[OPENTHREAD_CONFIG_NUM_SLAAC_ADDRESSES];
 #if GATEWAY_SEARCH
 static ot::Ip6::Address sGatewayAddress;
-static uint16_t sGatewayPort;
 static uint32_t sSearchGwTimeoutTime = 0;
 #endif
 
@@ -137,25 +136,23 @@ static void MqttsnSubscribe()
 }
 
 #if GATEWAY_SEARCH
-static void SearchGatewayCallback(const ot::Ip6::Address &aAddress, uint16_t aPort, uint8_t aGatewayId, void* aContext)
+static void SearchGatewayCallback(const ot::Ip6::Address &aAddress, uint8_t aGatewayId, void* aContext)
 {
     OT_UNUSED_VARIABLE(aContext);
 
-    PRINTF("SearchGw found gateway with id: %u, %s:%u\r\n", aGatewayId, aAddress.ToString().AsCString(), aPort);
+    PRINTF("SearchGw found gateway with id: %u, %s\r\n", aGatewayId, aAddress.ToString().AsCString());
     sGatewayAddress = aAddress;
-    sGatewayPort = aPort;
-    MqttsnConnect(sGatewayAddress, sGatewayPort);
+    MqttsnConnect(sGatewayAddress, GATEWAY_MULTICAST_PORT);
     sState = kMqttConnecting;
 }
 
-static void AdvertiseCallback(const ot::Ip6::Address &aAddress, uint16_t aPort, uint8_t aGatewayId, uint32_t aDuration, void* aContext)
+static void AdvertiseCallback(const ot::Ip6::Address &aAddress, uint8_t aGatewayId, uint32_t aDuration, void* aContext)
 {
     OT_UNUSED_VARIABLE(aContext);
 
-    PRINTF("Received gateway advertise with id: %u, %s:%u\r\n", aGatewayId, aAddress.ToString().AsCString(), aPort);
+    PRINTF("Received gateway advertise with id: %u, %s\r\n", aGatewayId, aAddress.ToString().AsCString());
     sGatewayAddress = aAddress;
-    sGatewayPort = aPort;
-    MqttsnConnect(sGatewayAddress, sGatewayPort);
+    MqttsnConnect(sGatewayAddress, GATEWAY_MULTICAST_PORT);
     sState = kMqttConnecting;
 }
 
@@ -190,27 +187,6 @@ static void ProcessWorker(ot::Instance &aInstance)
             sState = kThreadStarted;
         }
         break;
-    case kThreadStarted:
-        #if GATEWAY_SEARCH
-        SearchGateway(GATEWAY_MULTICAST_ADDRESS, GATEWAY_MULTICAST_PORT);
-#else
-        ot::Ip6::Address address;
-        address.FromString(GATEWAY_ADDRESS);
-        MqttsnConnect(address, GATEWAY_PORT);
-        sConnectionTimeoutTime = ot::TimerMilli::GetNow() + SEND_TIMEOUT;
-        sState = kMqttConnecting;
-#endif
-        break;
-#if GATEWAY_SEARCH
-    case kMqttSearchGw:
-        if (sConnectionTimeoutTime != 0 && sConnectionTimeoutTime < ot::TimerMilli::GetNow())
-        {
-            role = aInstance.GetThreadNetif().GetMle().GetRole();
-            PRINTF("Connection timeout. Role: %d\r\n", role);
-            sState = kThreadStarted;
-        }
-        break;
-#endif
     case kMqttConnecting:
         if (sConnectionTimeoutTime != 0 && sConnectionTimeoutTime < ot::TimerMilli::GetNow())
         {
@@ -223,6 +199,27 @@ static void ProcessWorker(ot::Instance &aInstance)
         MqttsnSubscribe();
         sState = kMqttRunning;
         break;
+    case kThreadStarted:
+#if GATEWAY_SEARCH
+        SearchGateway(GATEWAY_MULTICAST_ADDRESS, GATEWAY_MULTICAST_PORT);
+#else
+        ot::Ip6::Address address;
+        address.FromString(GATEWAY_ADDRESS);
+        MqttsnConnect(address, GATEWAY_PORT);
+        sConnectionTimeoutTime = ot::TimerMilli::GetNow() + SEND_TIMEOUT;
+        sState = kMqttConnecting;
+#endif
+        break;
+#if GATEWAY_SEARCH
+    case kMqttSearchGw:
+        if (sSearchGwTimeoutTime != 0 && sSearchGwTimeoutTime < ot::TimerMilli::GetNow())
+        {
+            role = aInstance.GetThreadNetif().GetMle().GetRole();
+            PRINTF("Connection timeout. Role: %d\r\n", role);
+            sState = kThreadStarted;
+        }
+        break;
+#endif
     default:
         break;
     }

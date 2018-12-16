@@ -340,8 +340,8 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
         if (client->mAdvertiseCallback)
         {
-            client->mAdvertiseCallback(messageInfo.GetPeerAddr(), messageInfo.GetPeerPort(),
-                static_cast<uint8_t>(gatewayId), static_cast<uint32_t>(duration), client->mAdvertiseContext);
+            client->mAdvertiseCallback(messageInfo.GetPeerAddr(), static_cast<uint8_t>(gatewayId),
+                static_cast<uint32_t>(duration), client->mAdvertiseContext);
         }
     }
         break;
@@ -356,14 +356,19 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
         if (client->mSearchGwCallback)
         {
+            Ip6::Address address;
             if (addressLength > 0)
             {
-                // client response not supported
-                break;
+                char addressBuffer[40];
+                memset(addressBuffer, 0 ,sizeof(addressBuffer));
+                memcpy(addressBuffer, addressText, addressLength);
+                address.FromString(addressBuffer);
             }
-            Ip6::Address address = messageInfo.GetPeerAddr();
-            uint16_t port = messageInfo.GetPeerPort();
-            client->mSearchGwCallback(address, port, gatewayId, client->mSearchGwContext);
+            else
+            {
+                address = messageInfo.GetPeerAddr();
+            }
+            client->mSearchGwCallback(address, gatewayId, client->mSearchGwContext);
         }
     }
         break;

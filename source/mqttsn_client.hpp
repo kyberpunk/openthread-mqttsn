@@ -204,9 +204,9 @@ public:
 
     typedef void (*PublishReceivedCallbackFunc)(const uint8_t* aPayload, int32_t aPayloadLength, Qos aQos, TopicId aTopicId, void* aContext);
 
-    typedef void (*AdvertiseCallbackFunc)(const Ip6::Address &aAddress, uint16_t aPort, uint8_t aGatewayId, uint32_t aDuration, void* aContext);
+    typedef void (*AdvertiseCallbackFunc)(const Ip6::Address &aAddress, uint8_t aGatewayId, uint32_t aDuration, void* aContext);
 
-    typedef void (*SearchGwCallbackFunc)(const Ip6::Address &aAddress, uint16_t aPort, uint8_t aGatewayId, void* aContext);
+    typedef void (*SearchGwCallbackFunc)(const Ip6::Address &aAddress, uint8_t aGatewayId, void* aContext);
 
     typedef void (*RegisterCallbackFunc)(ReturnCode aCode, TopicId aTopicId, void* aContext);
 
