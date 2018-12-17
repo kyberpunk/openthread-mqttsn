@@ -28,7 +28,7 @@
 #define GATEWAY_MULTICAST_ADDRESS "ff03::2"
 #define GATEWAY_MULTICAST_RADIUS 8
 
-#define DEFAULT_TOPIC "test"
+#define DEFAULT_TOPIC "topic"
 #define SEND_TIMEOUT 3000
 
 #define CLIENT_ID "THREAD"
@@ -154,7 +154,7 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::To
 
 static void MqttsnSubscribe()
 {
-    sClient->Subscribe(DEFAULT_TOPIC, ot::Mqttsn::Qos::kQos0, MqttsnSubscribeCallback, nullptr);
+    sClient->Subscribe(DEFAULT_TOPIC, ot::Mqttsn::Qos::kQos1, MqttsnSubscribeCallback, nullptr);
     PRINTF("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
 }
 
