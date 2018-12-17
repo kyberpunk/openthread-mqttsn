@@ -120,7 +120,7 @@ public:
         , mClientId()
         , mKeepAlive(30)
         , mCleanSession()
-        , mGatewayTimeout(10)
+        , mRetransmissionTimeout(10)
     {
         ;
     }
@@ -175,14 +175,14 @@ public:
         mCleanSession = aCleanSession;
     }
 
-    uint32_t GetGatewayTimeout()
+    uint32_t GetRetransmissionTimeout()
     {
-        return mGatewayTimeout;
+        return mRetransmissionTimeout;
     }
 
-    void SetGatewayTimeout(uint32_t aTimeout)
+    void SetRetransmissionTimeout(uint32_t aTimeout)
     {
-        mGatewayTimeout = aTimeout;
+        mRetransmissionTimeout = aTimeout;
     }
 
 private:
@@ -191,7 +191,7 @@ private:
     ClientIdString mClientId;
     uint16_t mKeepAlive;
     bool mCleanSession;
-    uint32_t mGatewayTimeout;
+    uint32_t mRetransmissionTimeout;
 };
 
 class MqttsnClient: public InstanceLocator
@@ -199,7 +199,8 @@ class MqttsnClient: public InstanceLocator
 public:
     enum
     {
-        kMaxTopicNameLength = 100
+        kMaxTopicPayloadLength = 255,
+        kMaxTopicNameLength = 50
     };
 
     typedef String<kMaxTopicNameLength> TopicNameString;
@@ -208,7 +209,7 @@ public:
 
     typedef void (*SubscribeCallbackFunc)(ReturnCode aCode, TopicId topicId, void* aContext);
 
-    typedef void (*PublishReceivedCallbackFunc)(const uint8_t* aPayload, int32_t aPayloadLength, Qos aQos, TopicId aTopicId, void* aContext);
+    typedef ReturnCode (*PublishReceivedCallbackFunc)(const uint8_t* aPayload, int32_t aPayloadLength, TopicId aTopicId, void* aContext);
 
     typedef void (*AdvertiseCallbackFunc)(const Ip6::Address &aAddress, uint8_t aGatewayId, uint32_t aDuration, void* aContext);
 
@@ -218,7 +219,7 @@ public:
 
     typedef ReturnCode (*RegisterReceivedCallbackFunc)(TopicId aTopicId, const TopicNameString &aTopicName, void* aContext);
 
-    typedef void (*PublishedCallbackFunc)(ReturnCode aCode, TopicId aTopicId, void* aContext);
+    typedef void (*PublishCallbackFunc)(ReturnCode aCode, TopicId aTopicId, void* aContext);
 
     typedef void (*UnsubscribeCallbackFunc)(ReturnCode aCode, void* aContext);
 
@@ -241,7 +242,7 @@ public:
 
     otError Register(const char* aTopicName, RegisterCallbackFunc aCallback, void* aContext);
 
-    otError Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, TopicId aTopicId);
+    otError Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, TopicId aTopicId, PublishCallbackFunc aCallback, void* aContext);
 
     otError Unsubscribe(TopicId aTopicId, UnsubscribeCallbackFunc aCallback, void* aContext);
 
@@ -262,8 +263,6 @@ public:
     otError SetAdvertiseCallback(AdvertiseCallbackFunc aCallback, void* aContext);
 
     otError SetSearchGwCallback(SearchGwCallbackFunc aCallback, void* aContext);
-
-    otError SetPublishedCallback(PublishedCallbackFunc aCallback, void* aContext);
 
     otError SetDisconnectedCallback(DisconnectedCallbackFunc aCallback, void* aContext);
 
@@ -292,6 +291,8 @@ private:
 
     static void HandleUnsubscribeTimeout(const MessageMetadata<UnsubscribeCallbackFunc> &aMetadata, void* aContext);
 
+    static void HandlePublishTimeout(const MessageMetadata<PublishCallbackFunc> &aMetadata, void* aContext);
+
     Ip6::UdpSocket mSocket;
     MqttsnConfig mConfig;
     uint16_t mPacketId;
@@ -304,6 +305,7 @@ private:
     WaitingMessagesQueue<SubscribeCallbackFunc> mSubscribeQueue;
     WaitingMessagesQueue<RegisterCallbackFunc> mRegisterQueue;
     WaitingMessagesQueue<UnsubscribeCallbackFunc> mUnsubscribeQueue;
+    WaitingMessagesQueue<PublishCallbackFunc> mPublishQos1Queue;
     ConnectCallbackFunc mConnectCallback;
     void* mConnectContext;
     PublishReceivedCallbackFunc mPublishReceivedCallback;
@@ -312,8 +314,6 @@ private:
     void* mAdvertiseContext;
     SearchGwCallbackFunc mSearchGwCallback;
     void* mSearchGwContext;
-    PublishedCallbackFunc mPublishedCallback;
-    void* mPublishedContext;
     DisconnectedCallbackFunc mDisconnectedCallback;
     void* mDisconnectedContext;
     RegisterReceivedCallbackFunc mRegisterReceivedCallback;

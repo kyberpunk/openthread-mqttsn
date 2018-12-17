@@ -79,16 +79,17 @@ static void MqttsnDisconnectedCallback(ot::Mqttsn::DisconnectType aType, void* a
     sState = kThreadStarted;
 }
 
-static void MqttsnReceived(const uint8_t* aPayload, int32_t aPayloadLength, ot::Mqttsn::Qos aQos, ot::Mqttsn::TopicId topicId, void* aContext)
+static ot::Mqttsn::ReturnCode MqttsnReceived(const uint8_t* aPayload, int32_t aPayloadLength, ot::Mqttsn::TopicId topicId, void* aContext)
 {
     OT_UNUSED_VARIABLE(aContext);
 
-    PRINTF("Message received from topic %d with QoS %d:\r\n", topicId, aQos);
+    PRINTF("Message received from topic %d.\r\n", topicId);
     for (int i = 0; i < aPayloadLength; i++)
     {
         PRINTF("%c", static_cast<int8_t>(aPayload[i]));
     }
     PRINTF("\r\n");
+    return ot::Mqttsn::kCodeAccepted;
 }
 
 static void MqttsnConnect(const ot::Ip6::Address &aAddress, uint16_t aPort)
@@ -114,6 +115,20 @@ static void MqttsnConnect(const ot::Ip6::Address &aAddress, uint16_t aPort)
     }
 }
 
+static void MqttsnPublished(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::TopicId aTopicId, void* aContext)
+{
+    OT_UNUSED_VARIABLE(aContext);
+
+    if (aCode == ot::Mqttsn::kCodeAccepted)
+    {
+        PRINTF("Successfully published to topic: %d.\r\n", aTopicId);
+    }
+    else
+    {
+        PRINTF("Publish failed with code: %d.\r\n", aCode);
+    }
+}
+
 static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::TopicId aTopicId, void* aContext)
 {
     OT_UNUSED_VARIABLE(aContext);
@@ -122,6 +137,14 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::To
     {
         PRINTF("Successfully subscribed to topic: %d.\r\n", aTopicId);
         sState = kMqttRunning;
+
+        // Test Qos 1 message
+        char text[] = "hello";
+        otError error = sClient->Publish(reinterpret_cast<unsigned char*>(text), sizeof(text), ot::Mqttsn::kQos1, aTopicId, MqttsnPublished, nullptr);
+        if (error != OT_ERROR_NONE)
+        {
+            PRINTF("Publish failed with error: %d.\r\n", error);
+        }
     }
     else
     {
