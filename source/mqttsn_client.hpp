@@ -197,6 +197,12 @@ private:
 class MqttsnClient: public InstanceLocator
 {
 public:
+    enum
+    {
+        kMaxTopicNameLength = 100
+    };
+
+    typedef String<kMaxTopicNameLength> TopicNameString;
 
     typedef void (*ConnectCallbackFunc)(ReturnCode aCode, void* aContext);
 
@@ -209,6 +215,8 @@ public:
     typedef void (*SearchGwCallbackFunc)(const Ip6::Address &aAddress, uint8_t aGatewayId, void* aContext);
 
     typedef void (*RegisterCallbackFunc)(ReturnCode aCode, TopicId aTopicId, void* aContext);
+
+    typedef ReturnCode (*RegisterReceivedCallbackFunc)(TopicId aTopicId, const TopicNameString &aTopicName, void* aContext);
 
     typedef void (*PublishedCallbackFunc)(ReturnCode aCode, TopicId aTopicId, void* aContext);
 
@@ -259,6 +267,8 @@ public:
 
     otError SetDisconnectedCallback(DisconnectedCallbackFunc aCallback, void* aContext);
 
+    otError SetRegisterReceivedCallback(RegisterReceivedCallbackFunc aCallback, void* aContext);
+
 private:
     static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
 
@@ -306,6 +316,8 @@ private:
     void* mPublishedContext;
     DisconnectedCallbackFunc mDisconnectedCallback;
     void* mDisconnectedContext;
+    RegisterReceivedCallbackFunc mRegisterReceivedCallback;
+    void* mRegisterReceivedContext;
 };
 
 }
