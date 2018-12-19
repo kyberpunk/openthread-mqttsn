@@ -168,7 +168,6 @@ class GwInfoMessage : public MessageBase
         : GwInfoMessage()
         , mGatewayId(aGatewayId)
         , mAddress(aAddress)
-        , mAddressLength(aAddressLength)
     {
         ;
     }
@@ -181,10 +180,6 @@ class GwInfoMessage : public MessageBase
 
     void SetAddress(const Ip6::Address &aAddress) { mAddress = aAddress; }
 
-    int32_t GetAddressLength() const { return mAddressLength; }
-
-    void SetAddressLength(int32_t aAddressLength) { mAddressLength = aAddressLength; }
-
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
     otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
@@ -192,7 +187,6 @@ class GwInfoMessage : public MessageBase
 private:
     uint8_t mGatewayId;
     Ip6::Address mAddress;
-    int32_t mAddressLength;
 };
 
 class ConnectMessage : public MessageBase
