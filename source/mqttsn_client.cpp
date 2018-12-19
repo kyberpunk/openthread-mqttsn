@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /*
  *  Copyright (c) 2018, Vit Holasek
  *  All rights reserved.
@@ -27,6 +28,9 @@
  */
 
 #include <cstring>
+=======
+#include <string.h>
+>>>>>>> 51a3bf2da844b94bd659a6625d586a367d4d8c60
 
 #include "mqttsn_client.hpp"
 #include "MQTTSNPacket.h"
@@ -478,6 +482,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         unsigned short topicId;
         unsigned short packetId;
         MQTTSNString topicName;
+        memset(&topicName, 0, sizeof(topicName));
         if (MQTTSNDeserialize_register(&topicId, &packetId, &topicName, data, length) != 1)
         {
             break;
@@ -564,6 +569,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
     case MQTTSN_PINGREQ:
     {
         MQTTSNString clientId;
+        memset(&clientId, 0, sizeof(clientId));
         Message* message = nullptr;
         int32_t packetLength = -1;
         unsigned char buffer[MAX_PACKET_SIZE];
@@ -746,6 +752,7 @@ otError MqttsnClient::Connect(MqttsnConfig &aConfig)
     mConfig = aConfig;
 
     MQTTSNString clientId;
+    memset(&clientId, 0, sizeof(clientId));
     clientId.cstring = const_cast<char *>(aConfig.GetClientId().AsCString());
     options.clientID = clientId;
     options.duration = aConfig.GetKeepAlive();
@@ -785,8 +792,7 @@ otError MqttsnClient::Subscribe(const char* aTopicName, Qos aQos, SubscribeCallb
         goto exit;
     }
 
-    // TODO: Implement QoS
-    if (aQos != Qos::kQos0)
+    if (aQos != kQos0 && aQos != kQos1)
     {
         error = OT_ERROR_NOT_IMPLEMENTED;
         goto exit;
@@ -819,6 +825,7 @@ otError MqttsnClient::Register(const char* aTopicName, RegisterCallbackFunc aCal
     int32_t length = -1;
     Message* message = nullptr;
     MQTTSNString topicName;
+    memset(&topicName, 0, sizeof(topicName));
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive)
@@ -858,8 +865,7 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t lenght, Qos aQos, To
         goto exit;
     }
 
-    // TODO: Implement QoS
-    if (aQos != Qos::kQos0 || aQos != Qos::kQos1)
+    if (aQos != Qos::kQos0 && aQos != Qos::kQos1)
     {
         error = OT_ERROR_NOT_IMPLEMENTED;
         goto exit;
@@ -877,9 +883,12 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t lenght, Qos aQos, To
     }
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
-    SuccessOrExit(error = mRegisterQueue.EnqueueCopy(*message, message->GetLength(),
+    if (aQos == Qos::kQos1)
+    {
+        SuccessOrExit(error = mPublishQos1Queue.EnqueueCopy(*message, message->GetLength(),
             MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mPacketId, TimerMilli::GetNow(),
                 mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+    }
     mPacketId++;
 
 exit:
@@ -1131,6 +1140,7 @@ otError MqttsnClient::PingGateway()
     }
 
     MQTTSNString clientId;
+    memset(&clientId, 0, sizeof(clientId));
     clientId.cstring = const_cast<char *>(mConfig.GetClientId().AsCString());
     length = MQTTSNSerialize_pingreq(buffer, MAX_PACKET_SIZE, clientId);
 
