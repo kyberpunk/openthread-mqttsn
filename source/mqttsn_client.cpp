@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /*
  *  Copyright (c) 2018, Vit Holasek
  *  All rights reserved.
@@ -27,10 +26,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <cstring>
-=======
 #include <string.h>
->>>>>>> 51a3bf2da844b94bd659a6625d586a367d4d8c60
 
 #include "mqttsn_client.hpp"
 #include "MQTTSNPacket.h"
