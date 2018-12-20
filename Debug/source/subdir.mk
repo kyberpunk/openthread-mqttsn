@@ -5,6 +5,7 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
 ../source/mqttsn_client.cpp \
+../source/mqttsn_serializer.cpp \
 ../source/openthread-mqttsn.cpp 
 
 C_SRCS += \
@@ -13,12 +14,14 @@ C_SRCS += \
 
 OBJS += \
 ./source/mqttsn_client.o \
+./source/mqttsn_serializer.o \
 ./source/mtb.o \
 ./source/openthread-mqttsn.o \
 ./source/semihost_hardfault.o 
 
 CPP_DEPS += \
 ./source/mqttsn_client.d \
+./source/mqttsn_serializer.d \
 ./source/openthread-mqttsn.d 
 
 C_DEPS += \

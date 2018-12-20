@@ -62,7 +62,7 @@ enum MessageType
     kTypeSuback,
     kTypeUnsubscribe,
     kTypeUnsuback,
-    kTypePinreq,
+    kTypePingreq,
     kTypePingresp,
     kTypeDisconnect,
     kTypeReserved3,
@@ -75,13 +75,14 @@ enum MessageType
 
 class MessageBase
 {
-public:
+protected:
     MessageBase(MessageType aMessageType)
-        : mMessageType(mMessageType)
+        : mMessageType(aMessageType)
     {
         ;
     }
 
+public:
     MessageType GetMessageType() { return mMessageType; };
 
     void SetMessageType(MessageType aMessageType) { mMessageType = aMessageType; };
@@ -90,7 +91,7 @@ public:
 
     virtual otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength) = 0;
 
-    static MessageType DeserializeMessageType(uint8_t* aBuffer, int32_t aBufferLength);
+    static otError DeserializeMessageType(uint8_t* aBuffer, int32_t aBufferLength, MessageType* aMessageType);
 
 private:
     MessageType mMessageType;
@@ -98,6 +99,7 @@ private:
 
 class AdvertiseMessage : public MessageBase
 {
+public:
     AdvertiseMessage()
         : MessageBase(kTypeAdvertise)
     {
@@ -105,7 +107,7 @@ class AdvertiseMessage : public MessageBase
     }
 
     AdvertiseMessage (uint8_t aGatewayId, uint16_t aDuration)
-        : AdvertiseMessage()
+        : MessageBase(kTypeAdvertise)
         , mGatewayId(aGatewayId)
         , mDuration(aDuration)
     {
@@ -131,6 +133,7 @@ private:
 
 class SearchGwMessage : public MessageBase
 {
+public:
     SearchGwMessage()
         : MessageBase(kTypeSearchGw)
     {
@@ -138,7 +141,7 @@ class SearchGwMessage : public MessageBase
     }
 
     SearchGwMessage (uint8_t aRadius)
-        : SearchGwMessage()
+        : MessageBase(kTypeSearchGw)
         , mRadius(aRadius)
     {
         ;
@@ -158,6 +161,7 @@ private:
 
 class GwInfoMessage : public MessageBase
 {
+public:
     GwInfoMessage()
         : MessageBase(kTypeGwInfo)
     {
@@ -165,7 +169,7 @@ class GwInfoMessage : public MessageBase
     }
 
     GwInfoMessage (uint8_t aGatewayId, const Ip6::Address &aAddress, int32_t aAddressLength)
-        : GwInfoMessage()
+        : MessageBase(kTypeGwInfo)
         , mGatewayId(aGatewayId)
         , mAddress(aAddress)
     {
@@ -176,7 +180,7 @@ class GwInfoMessage : public MessageBase
 
     void SetGatewayId(uint8_t aGatewayId) { mGatewayId = aGatewayId; }
 
-    Ip6::Address GetAddress() const { return mAddress; }
+    const Ip6::Address &GetAddress() const { return mAddress; }
 
     void SetAddress(const Ip6::Address &aAddress) { mAddress = aAddress; }
 
@@ -191,6 +195,7 @@ private:
 
 class ConnectMessage : public MessageBase
 {
+public:
     ConnectMessage()
         : MessageBase(kTypeConnect)
     {
@@ -198,7 +203,7 @@ class ConnectMessage : public MessageBase
     }
 
     ConnectMessage (bool aCleanSessionFlag, bool aWillFlag, uint16_t aDuration, const char* aClientId)
-        : ConnectMessage()
+        : MessageBase(kTypeConnect)
         , mCleanSessionFlag(aCleanSessionFlag)
         , mWillFlag(aWillFlag)
         , mDuration(aDuration)
@@ -236,6 +241,7 @@ private:
 
 class ConnackMessage : public MessageBase
 {
+public:
     ConnackMessage()
         : MessageBase(kTypeConnack)
     {
@@ -243,15 +249,15 @@ class ConnackMessage : public MessageBase
     }
 
     ConnackMessage (ReturnCode aReturnCode)
-        : ConnackMessage()
+        : MessageBase(kTypeConnack)
         , mReturnCode(aReturnCode)
     {
         ;
     }
 
-    bool GetReturnCode() const { return mReturnCode; }
+    ReturnCode GetReturnCode() const { return mReturnCode; }
 
-    void SetReturnCode(bool aReturnCode) { mReturnCode = aReturnCode; }
+    void SetReturnCode(ReturnCode aReturnCode) { mReturnCode = aReturnCode; }
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
@@ -263,6 +269,7 @@ private:
 
 class RegisterMessage : public MessageBase
 {
+public:
     RegisterMessage()
         : MessageBase(kTypeRegister)
     {
@@ -270,7 +277,7 @@ class RegisterMessage : public MessageBase
     }
 
     RegisterMessage (TopicId aTopicId, uint16_t aMessageId, const char* aTopicName)
-        : RegisterMessage()
+        : MessageBase(kTypeRegister)
         , mTopicId(aTopicId)
         , mMessageId(aMessageId)
         , mTopicName("%s", aTopicName)
@@ -302,14 +309,15 @@ private:
 
 class RegackMessage : public MessageBase
 {
+public:
     RegackMessage()
         : MessageBase(kTypeRegack)
     {
         ;
     }
 
-    RegackMessage (ReturnCode aReturnCode)
-        : RegackMessage()
+    RegackMessage (ReturnCode aReturnCode, TopicId aTopicId, uint16_t aMessageId)
+        : MessageBase(kTypeRegack)
         , mReturnCode(aReturnCode)
         , mTopicId(aTopicId)
         , mMessageId(aMessageId)
@@ -317,9 +325,9 @@ class RegackMessage : public MessageBase
         ;
     }
 
-    bool GetReturnCode() const { return mReturnCode; }
+    ReturnCode GetReturnCode() const { return mReturnCode; }
 
-    void SetReturnCode(bool aReturnCode) { mReturnCode = aReturnCode; }
+    void SetReturnCode(ReturnCode aReturnCode) { mReturnCode = aReturnCode; }
 
     TopicId GetTopicId() const { return mTopicId; }
 
@@ -341,6 +349,7 @@ private:
 
 class PublishMessage : public MessageBase
 {
+public:
     PublishMessage()
         : MessageBase(kTypePublish)
     {
@@ -348,7 +357,7 @@ class PublishMessage : public MessageBase
     }
 
     PublishMessage(bool aDupFlag, bool aRetainedFlag, Qos aQos, uint16_t aMessageId, TopicId aTopicId, const uint8_t* aPayload, int32_t aPayloadLength)
-        : PublishMessage()
+        : MessageBase(kTypePublish)
         , mDupFlag(aDupFlag)
         , mRetainedFlag(aRetainedFlag)
         , mQos(aQos)
@@ -374,7 +383,7 @@ class PublishMessage : public MessageBase
 
     const uint8_t* GetPayload() const { return mPayload; }
 
-    void SetPayload(const uint8_t aPayload) { mPayload = aPayload; }
+    void SetPayload(const uint8_t* aPayload) { mPayload = aPayload; }
 
     int32_t GetPayloadLength() { return mPayloadLength; }
 
@@ -396,14 +405,15 @@ private:
 
 class PubackMessage : public MessageBase
 {
+public:
     PubackMessage()
         : MessageBase(kTypePuback)
     {
         ;
     }
 
-    PubackMessage (ReturnCode aReturnCode)
-        : PubackMessage()
+    PubackMessage (ReturnCode aReturnCode, TopicId aTopicId, uint16_t aMessageId)
+        : MessageBase(kTypePuback)
         , mReturnCode(aReturnCode)
         , mTopicId(aTopicId)
         , mMessageId(aMessageId)
@@ -411,9 +421,9 @@ class PubackMessage : public MessageBase
         ;
     }
 
-    bool GetReturnCode() const { return mReturnCode; }
+    ReturnCode GetReturnCode() const { return mReturnCode; }
 
-    void SetReturnCode(bool aReturnCode) { mReturnCode = aReturnCode; }
+    void SetReturnCode(ReturnCode aReturnCode) { mReturnCode = aReturnCode; }
 
     TopicId GetTopicId() const { return mTopicId; }
 
@@ -435,14 +445,15 @@ private:
 
 class PubcompMessage : public MessageBase
 {
+public:
     PubcompMessage()
         : MessageBase(kTypePubcomp)
     {
         ;
     }
 
-    PubcompMessage (ReturnCode aReturnCode)
-        : PubcompMessage()
+    PubcompMessage (ReturnCode aReturnCode, uint16_t aMessageId)
+        : MessageBase(kTypePubcomp)
         , mMessageId(aMessageId)
     {
         ;
@@ -462,14 +473,15 @@ private:
 
 class PubrecMessage : public MessageBase
 {
+public:
     PubrecMessage()
         : MessageBase(kTypePubrec)
     {
         ;
     }
 
-    PubrecMessage (ReturnCode aReturnCode)
-        : PubrecMessage()
+    PubrecMessage (ReturnCode aReturnCode, uint16_t aMessageId)
+        : MessageBase(kTypePubrec)
         , mMessageId(aMessageId)
     {
         ;
@@ -489,14 +501,15 @@ private:
 
 class PubrelMessage : public MessageBase
 {
+public:
     PubrelMessage()
         : MessageBase(kTypePubrel)
     {
         ;
     }
 
-    PubrelMessage (ReturnCode aReturnCode)
-        : PubrelMessage()
+    PubrelMessage (ReturnCode aReturnCode, uint16_t aMessageId)
+        : MessageBase(kTypePubrel)
         , mMessageId(aMessageId)
     {
         ;
@@ -516,14 +529,15 @@ private:
 
 class SubscribeMessage : public MessageBase
 {
+public:
     SubscribeMessage()
         : MessageBase(kTypeSubscribe)
     {
         ;
     }
 
-    SubscribeMessage(bool aDupFlag, bool aRetainedFlag, Qos aQos, uint16_t aMessageId, TopicId aTopicId, const uint8_t* aPayload, int32_t aPayloadLength)
-        : SubscribeMessage()
+    SubscribeMessage(bool aDupFlag, Qos aQos, uint16_t aMessageId, const char* aTopicName)
+        : MessageBase(kTypeSubscribe)
         , mDupFlag(aDupFlag)
         , mQos(aQos)
         , mMessageId(aMessageId)
@@ -557,14 +571,15 @@ private:
 
 class SubackMessage : public MessageBase
 {
+public:
     SubackMessage()
         : MessageBase(kTypeSuback)
     {
         ;
     }
 
-    SubackMessage (ReturnCode aReturnCode)
-        : SubackMessage()
+    SubackMessage (ReturnCode aReturnCode, TopicId aTopicId, uint16_t aMessageId)
+        : MessageBase(kTypeSuback)
         , mReturnCode(aReturnCode)
         , mTopicId(aTopicId)
         , mMessageId(aMessageId)
@@ -572,9 +587,9 @@ class SubackMessage : public MessageBase
         ;
     }
 
-    bool GetReturnCode() const { return mReturnCode; }
+    ReturnCode GetReturnCode() const { return mReturnCode; }
 
-    void SetReturnCode(bool aReturnCode) { mReturnCode = aReturnCode; }
+    void SetReturnCode(ReturnCode aReturnCode) { mReturnCode = aReturnCode; }
 
     TopicId GetTopicId() const { return mTopicId; }
 
@@ -596,23 +611,20 @@ private:
 
 class UnsubscribeMessage : public MessageBase
 {
+public:
     UnsubscribeMessage()
         : MessageBase(kTypeUnsubscribe)
     {
         ;
     }
 
-    UnsubscribeMessage (ReturnCode aReturnCode)
-        : UnsubscribeMessage()
+    UnsubscribeMessage (TopicId aTopicId, uint16_t aMessageId)
+        : MessageBase(kTypeUnsubscribe)
         , mTopicId(aTopicId)
         , mMessageId(aMessageId)
     {
         ;
     }
-
-    bool GetReturnCode() const { return mReturnCode; }
-
-    void SetReturnCode(bool aReturnCode) { mReturnCode = aReturnCode; }
 
     TopicId GetTopicId() const { return mTopicId; }
 
@@ -633,14 +645,15 @@ private:
 
 class UnsubackMessage : public MessageBase
 {
+public:
     UnsubackMessage()
         : MessageBase(kTypeUnsuback)
     {
         ;
     }
 
-    UnsubackMessage (ReturnCode aReturnCode)
-        : UnsubackMessage()
+    UnsubackMessage (ReturnCode aReturnCode, uint16_t aMessageId)
+        : MessageBase(kTypeUnsuback)
         , mMessageId(aMessageId)
     {
         ;
@@ -660,6 +673,7 @@ private:
 
 class PingreqMessage : public MessageBase
 {
+public:
     PingreqMessage()
         : MessageBase(kTypePingreq)
     {
@@ -667,7 +681,7 @@ class PingreqMessage : public MessageBase
     }
 
     PingreqMessage (const char* aClientId)
-        : PingreqMessage()
+        : MessageBase(kTypePingreq)
         , mClientId("%s", aClientId)
     {
         ;
@@ -687,14 +701,9 @@ private:
 
 class PingrespMessage : public MessageBase
 {
+public:
     PingrespMessage()
         : MessageBase(kTypePingresp)
-    {
-        ;
-    }
-
-    PingrespMessage ()
-        : PingrespMessage()
     {
         ;
     }
@@ -706,6 +715,7 @@ class PingrespMessage : public MessageBase
 
 class DisconnectMessage : public MessageBase
 {
+public:
     DisconnectMessage()
         : MessageBase(kTypeDisconnect)
     {
@@ -713,7 +723,7 @@ class DisconnectMessage : public MessageBase
     }
 
     DisconnectMessage (uint16_t aDuration)
-        : DisconnectMessage()
+        : MessageBase(kTypeDisconnect)
         , mDuration(aDuration)
     {
         ;

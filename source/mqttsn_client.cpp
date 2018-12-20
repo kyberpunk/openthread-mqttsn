@@ -27,8 +27,8 @@
  */
 
 #include <string.h>
-
 #include "mqttsn_client.hpp"
+#include "mqttsn_serializer.hpp"
 #include "MQTTSNPacket.h"
 #include "MQTTSNConnect.h"
 #include "MQTTSNSearch.h"
@@ -280,12 +280,12 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
     {
     case MQTTSN_CONNACK:
     {
-        int connectReturnCode = 0;
         if (!client->VerifyGatewayAddress(messageInfo))
         {
             break;
         }
-        if (MQTTSNDeserialize_connack(&connectReturnCode, data, length) != 1)
+        ConnackMessage connackMessage;
+        if (connackMessage.Deserialize(data, length) != OT_ERROR_NONE)
         {
             break;
         }
@@ -293,8 +293,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         client->mGwTimeout = 0;
         if (client->mConnectCallback)
         {
-            client->mConnectCallback(static_cast<ReturnCode>(connectReturnCode),
-                client->mConnectContext);
+            client->mConnectCallback(connackMessage.GetReturnCode(), client->mConnectContext);
         }
     }
         break;
@@ -738,7 +737,8 @@ otError MqttsnClient::Connect(MqttsnConfig &aConfig)
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
-    MQTTSNPacket_connectData options = MQTTSNPacket_connectData_initializer;
+    ConnectMessage connectMessage;
+    unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState == kStateActive)
     {
@@ -747,20 +747,8 @@ otError MqttsnClient::Connect(MqttsnConfig &aConfig)
     }
     mConfig = aConfig;
 
-    MQTTSNString clientId;
-    memset(&clientId, 0, sizeof(clientId));
-    clientId.cstring = const_cast<char *>(aConfig.GetClientId().AsCString());
-    options.clientID = clientId;
-    options.duration = aConfig.GetKeepAlive();
-    options.cleansession = static_cast<unsigned char>(aConfig.GetCleanSession());
-
-    unsigned char buffer[MAX_PACKET_SIZE];
-    length = MQTTSNSerialize_connect(buffer, MAX_PACKET_SIZE, &options);
-    if (length <= 0)
-    {
-        error = OT_ERROR_FAILED;
-        goto exit;
-    }
+    connectMessage = ConnectMessage(mConfig.GetCleanSession(), 0, mConfig.GetKeepAlive(), mConfig.GetClientId().AsCString());
+    SuccessOrExit(error = connectMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
 
