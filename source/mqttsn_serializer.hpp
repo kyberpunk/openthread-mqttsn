@@ -89,9 +89,9 @@ public:
 
     virtual otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const = 0;
 
-    virtual otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength) = 0;
+    virtual otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength) = 0;
 
-    static otError DeserializeMessageType(uint8_t* aBuffer, int32_t aBufferLength, MessageType* aMessageType);
+    static otError DeserializeMessageType(const uint8_t* aBuffer, int32_t aBufferLength, MessageType* aMessageType);
 
 private:
     MessageType mMessageType;
@@ -124,7 +124,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     uint8_t mGatewayId;
@@ -153,7 +153,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     uint8_t mRadius;
@@ -186,7 +186,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     uint8_t mGatewayId;
@@ -230,7 +230,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     bool mCleanSessionFlag;
@@ -261,7 +261,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     ReturnCode mReturnCode;
@@ -299,7 +299,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     TopicId mTopicId;
@@ -339,7 +339,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     ReturnCode mReturnCode;
@@ -377,9 +377,17 @@ public:
 
     void SetRetainedFlag(bool aRetainedFlag) { mRetainedFlag = aRetainedFlag; }
 
+    Qos GetQos() const { return mQos; }
+
+    void SetQos(Qos qos) { mQos = qos; }
+
     uint16_t GetMessageId() const { return mMessageId; }
 
     void SetMessageId(uint16_t aMessageId) { mMessageId = aMessageId; }
+
+    TopicId GetTopicId() const { return mTopicId; }
+
+    void SetTopicId(TopicId aTopicId) { mTopicId = aTopicId; }
 
     const uint8_t* GetPayload() const { return mPayload; }
 
@@ -391,7 +399,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     bool mDupFlag;
@@ -435,7 +443,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     ReturnCode mReturnCode;
@@ -465,7 +473,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     uint16_t mMessageId;
@@ -493,7 +501,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     uint16_t mMessageId;
@@ -521,7 +529,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     uint16_t mMessageId;
@@ -560,7 +568,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     bool mDupFlag;
@@ -601,7 +609,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     ReturnCode mReturnCode;
@@ -636,7 +644,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     TopicId mTopicId;
@@ -665,7 +673,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     uint16_t mMessageId;
@@ -693,7 +701,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     ClientIdString mClientId;
@@ -710,7 +718,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 };
 
 class DisconnectMessage : public MessageBase
@@ -735,7 +743,7 @@ public:
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
-    otError Deserialize(uint8_t* aBuffer, int32_t aBufferLength);
+    otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
     uint16_t mDuration;

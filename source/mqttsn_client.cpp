@@ -340,37 +340,30 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
-        int qos;
-        unsigned short packetId = 0;
-        int payloadLength = 0;
-        unsigned char* payload;
-        unsigned char dup = 0;
-        unsigned char retained = 0;
-        MQTTSN_topicid topicId;
-        if (MQTTSNDeserialize_publish(&dup, &qos, &retained, &packetId,
-            &topicId, &payload, &payloadLength, data, length) != 1)
+        PublishMessage publishMessage;
+        if (publishMessage.Deserialize(data, length) != OT_ERROR_NONE)
         {
             break;
         }
         ReturnCode code = kCodeRejectedTopicId;
         if (client->mPublishReceivedCallback)
         {
-            code = client->mPublishReceivedCallback(payload, payloadLength, static_cast<TopicId>(topicId.data.id),
-                client->mPublishReceivedContext);
+            code = client->mPublishReceivedCallback(publishMessage.GetPayload(), publishMessage.GetPayloadLength(),
+                publishMessage.GetTopicId(), client->mPublishReceivedContext);
         }
 
-        if (static_cast<Qos>(qos) == kQos1)
+        if (publishMessage.GetQos() == kQos0)
         {
             // do nothing
+            break;
         }
-        else if (static_cast<Qos>(qos) == kQos1)
+        else if (publishMessage.GetQos() == kQos1)
         {
             int32_t packetLength = -1;
             Message* message = nullptr;
             unsigned char buffer[MAX_PACKET_SIZE];
-
-            packetLength = MQTTSNSerialize_puback(buffer, MAX_PACKET_SIZE, topicId.data.id, packetId, code);
-            if (packetLength <= 0)
+            PubackMessage pubackMessage(code, publishMessage.GetTopicId(), publishMessage.GetMessageId());
+            if (pubackMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
             {
                 break;
             }
@@ -382,6 +375,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
         else
         {
+            // not supported yet
             break;
         }
     }
@@ -439,22 +433,20 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             break;
         }
 
-        unsigned short topicId;
-        unsigned short packetId;
-        unsigned char returnCode;
-        if (MQTTSNDeserialize_regack(&topicId, &packetId, &returnCode, data, length) != 1)
+        RegackMessage regackMessage;
+        if (regackMessage.Deserialize(data, length) != OT_ERROR_NONE)
         {
             break;
         }
         MessageMetadata<RegisterCallbackFunc> metadata;
-        Message* message = client->mRegisterQueue.Find(packetId, metadata);
+        Message* message = client->mRegisterQueue.Find(regackMessage.GetMessageId(), metadata);
         if (!message)
         {
             break;
         }
         if (metadata.mCallback)
         {
-            metadata.mCallback(static_cast<ReturnCode>(returnCode), static_cast<TopicId>(topicId), metadata.mContext);
+            metadata.mCallback(regackMessage.GetReturnCode(), regackMessage.GetTopicId(), metadata.mContext);
         }
         client->mRegisterQueue.Dequeue(*message);
     }
@@ -511,23 +503,21 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             break;
         }
 
-        unsigned short topicId;
-        unsigned short packetId;
-        unsigned char returnCode;
-        if (MQTTSNDeserialize_puback(&topicId, &packetId, &returnCode, data, length) != 1)
+        PubackMessage pubackMessage;
+        if (pubackMessage.Deserialize(data, length) != OT_ERROR_NONE)
         {
             break;
         }
         // Process Qos 1 message
         MessageMetadata<PublishCallbackFunc> metadata;
-        Message* message = client->mPublishQos1Queue.Find(packetId, metadata);
+        Message* message = client->mPublishQos1Queue.Find(pubackMessage.GetMessageId(), metadata);
         if (!message)
         {
             break;
         }
         if (metadata.mCallback)
         {
-            metadata.mCallback(static_cast<ReturnCode>(returnCode), static_cast<TopicId>(topicId), metadata.mContext);
+            metadata.mCallback(pubackMessage.GetReturnCode(), pubackMessage.GetTopicId(), metadata.mContext);
         }
         client->mPublishQos1Queue.Dequeue(*message);
     }
@@ -737,7 +727,7 @@ otError MqttsnClient::Connect(MqttsnConfig &aConfig)
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
-    ConnectMessage connectMessage;
+    ConnectMessage connectMessage(mConfig.GetCleanSession(), 0, mConfig.GetKeepAlive(), mConfig.GetClientId().AsCString());
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState == kStateActive)
@@ -747,7 +737,6 @@ otError MqttsnClient::Connect(MqttsnConfig &aConfig)
     }
     mConfig = aConfig;
 
-    connectMessage = ConnectMessage(mConfig.GetCleanSession(), 0, mConfig.GetKeepAlive(), mConfig.GetClientId().AsCString());
     SuccessOrExit(error = connectMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
@@ -808,8 +797,7 @@ otError MqttsnClient::Register(const char* aTopicName, RegisterCallbackFunc aCal
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
-    MQTTSNString topicName;
-    memset(&topicName, 0, sizeof(topicName));
+    RegisterMessage registerMessage(0, mPacketId, aTopicName);
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive)
@@ -817,14 +805,7 @@ otError MqttsnClient::Register(const char* aTopicName, RegisterCallbackFunc aCal
         error = OT_ERROR_INVALID_STATE;
         goto exit;
     }
-
-    topicName.cstring = const_cast<char*>(aTopicName);
-    length = MQTTSNSerialize_register(buffer, MAX_PACKET_SIZE, 0, mPacketId, &topicName);
-    if (length <= 0)
-    {
-        error = OT_ERROR_FAILED;
-        goto exit;
-    }
+    SuccessOrExit(error = registerMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
     SuccessOrExit(error = mRegisterQueue.EnqueueCopy(*message, message->GetLength(),
@@ -836,11 +817,12 @@ exit:
     return error;
 }
 
-otError MqttsnClient::Publish(const uint8_t* aData, int32_t lenght, Qos aQos, TopicId aTopicId, PublishCallbackFunc aCallback, void* aContext)
+otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, TopicId aTopicId, PublishCallbackFunc aCallback, void* aContext)
 {
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
+    PublishMessage publishMessage(0, 0, aQos, mPacketId, aTopicId, aData, aLength);
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive)
@@ -855,16 +837,7 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t lenght, Qos aQos, To
         goto exit;
     }
 
-    MQTTSN_topicid topic;
-    topic.type = MQTTSN_TOPIC_TYPE_NORMAL;
-    topic.data.id = static_cast<unsigned short>(aTopicId);
-    length = MQTTSNSerialize_publish(buffer, MAX_PACKET_SIZE, 0, static_cast<int>(aQos), 0,
-        mPacketId, topic, const_cast<unsigned char *>(aData), lenght);
-    if (length <= 0)
-    {
-        error = OT_ERROR_FAILED;
-        goto exit;
-    }
+    SuccessOrExit(error = publishMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
     if (aQos == Qos::kQos1)
