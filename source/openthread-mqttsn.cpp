@@ -157,13 +157,13 @@ static void MqttsnPublished(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::TopicId aT
     }
 }
 
-static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::TopicId aTopicId, void* aContext)
+static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::TopicId aTopicId, ot::Mqttsn::Qos aQos, void* aContext)
 {
     OT_UNUSED_VARIABLE(aContext);
 
     if (aCode == ot::Mqttsn::kCodeAccepted)
     {
-        PRINTF("Successfully subscribed to topic: %d.\r\n", aTopicId);
+        PRINTF("Successfully subscribed to topic: %d with QoS level %d.\r\n", aTopicId, aQos);
         sState = kMqttRunning;
 
         // Test Qos 1 message

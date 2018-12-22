@@ -233,7 +233,7 @@ public:
 
     typedef void (*ConnectCallbackFunc)(ReturnCode aCode, void* aContext);
 
-    typedef void (*SubscribeCallbackFunc)(ReturnCode aCode, TopicId topicId, void* aContext);
+    typedef void (*SubscribeCallbackFunc)(ReturnCode aCode, TopicId topicId, Qos aQos, void* aContext);
 
     typedef ReturnCode (*PublishReceivedCallbackFunc)(const uint8_t* aPayload, int32_t aPayloadLength, TopicId aTopicId, void* aContext);
 

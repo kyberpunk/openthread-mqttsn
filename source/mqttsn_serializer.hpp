@@ -603,6 +603,10 @@ public:
 
     void SetTopicId(TopicId aTopicId) { mTopicId = aTopicId; }
 
+    Qos GetQos() const { return mQos; }
+
+    void SetQos(Qos aQos) { mQos = aQos; }
+
     uint16_t GetMessageId() const { return mMessageId; }
 
     void SetMessageId(uint16_t aMessageId) { mMessageId = aMessageId; }
@@ -614,6 +618,7 @@ public:
 private:
     ReturnCode mReturnCode;
     TopicId mTopicId;
+    Qos mQos;
     uint16_t mMessageId;
 };
 

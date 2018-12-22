@@ -297,6 +297,117 @@ otError PubackMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength
     return OT_ERROR_NONE;
 }
 
+otError PubcompMessage::Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const
+{
+    int32_t length = MQTTSNSerialize_pubcomp(aBuffer, aBufferLength, mMessageId);
+    if (length <= 0)
+    {
+        return OT_ERROR_FAILED;
+    }
+    *aLength = length;
+    return OT_ERROR_NONE;
+}
+
+otError PubcompMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength)
+{
+    return OT_ERROR_NOT_IMPLEMENTED;
+}
+
+otError PubrecMessage::Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const
+{
+    int32_t length = MQTTSNSerialize_pubrec(aBuffer, aBufferLength, mMessageId);
+    if (length <= 0)
+    {
+        return OT_ERROR_FAILED;
+    }
+    *aLength = length;
+    return OT_ERROR_NONE;
+}
+
+otError PubrecMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength)
+{
+    return OT_ERROR_NOT_IMPLEMENTED;
+}
+
+otError PubrelMessage::Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const
+{
+    int32_t length = MQTTSNSerialize_pubrel(aBuffer, aBufferLength, mMessageId);
+    if (length <= 0)
+    {
+        return OT_ERROR_FAILED;
+    }
+    *aLength = length;
+    return OT_ERROR_NONE;
+}
+
+otError PubrelMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength)
+{
+    return OT_ERROR_NOT_IMPLEMENTED;
+}
+
+otError SubscribeMessage::Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const
+{
+    MQTTSN_topicid topicId;
+    memset(&topicId, 0, sizeof(topicId));
+    topicId.type = MQTTSN_TOPIC_TYPE_NORMAL;
+    topicId.data.long_.name = const_cast<char*>(mTopicName.AsCString());
+    topicId.data.long_.len = mTopicName.GetLength();
+    int32_t length = MQTTSNSerialize_subscribe(aBuffer, aBufferLength, static_cast<unsigned char>(mDupFlag),
+        static_cast<int>(mQos), mMessageId, &topicId);
+    if (length <= 0)
+    {
+        return OT_ERROR_FAILED;
+    }
+    *aLength = length;
+    return OT_ERROR_NONE;
+}
+
+otError SubscribeMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength)
+{
+    otError error = OT_ERROR_NONE;
+    unsigned char dup;
+    int qos;
+    MQTTSN_topicid topicId;
+    memset(&topicId, 0, sizeof(topicId));
+    if (MQTTSNDeserialize_subscribe(&dup, &qos, &mMessageId, &topicId, const_cast<unsigned char*>(aBuffer), aBufferLength) != 1)
+    {
+        return OT_ERROR_FAILED;
+    }
+    mDupFlag = static_cast<bool>(dup);
+    mQos = static_cast<Qos>(qos);
+    SuccessOrExit(error = mTopicName.Set("%.*s", topicId.data.long_.len, topicId.data.long_.name));
+
+exit:
+    return error;
+}
+
+otError SubackMessage::Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const
+{
+    int32_t length = MQTTSNSerialize_suback(aBuffer, aBufferLength, static_cast<int>(mQos),
+        static_cast<unsigned short>(mTopicId), mMessageId, static_cast<unsigned char>(mReturnCode));
+    if (length <= 0)
+    {
+        return OT_ERROR_FAILED;
+    }
+    *aLength = length;
+    return OT_ERROR_NONE;
+}
+
+otError SubackMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength)
+{
+    unsigned short topicId;
+    unsigned char code;
+    int qos;
+    if (MQTTSNDeserialize_suback(&qos, &topicId, &mMessageId, &code, const_cast<unsigned char*>(aBuffer), aBufferLength))
+    {
+        return OT_ERROR_FAILED;
+    }
+    mTopicId = static_cast<TopicId>(topicId);
+    mReturnCode = static_cast<ReturnCode>(code);
+    mQos = static_cast<Qos>(qos);
+    return OT_ERROR_NONE;
+}
+
 }
 
 }
