@@ -100,9 +100,17 @@ otError SearchGwMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLeng
 
 otError GwInfoMessage::Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const
 {
-    Ip6::Address::InfoString addressString = mAddress.ToString();
-    char* address = const_cast<char*>(addressString.AsCString());
-    int32_t length = MQTTSNSerialize_gwinfo(aBuffer, aBufferLength, mGatewayId, addressString.GetLength(), reinterpret_cast<unsigned char*>(address));
+    int32_t length = -1;
+    if (mHasAddress)
+    {
+        Ip6::Address::InfoString addressString = mAddress.ToString();
+        char* address = const_cast<char*>(addressString.AsCString());
+        length = MQTTSNSerialize_gwinfo(aBuffer, aBufferLength, mGatewayId, addressString.GetLength(), reinterpret_cast<unsigned char*>(address));
+    }
+    else
+    {
+        length = MQTTSNSerialize_gwinfo(aBuffer, aBufferLength, mGatewayId, 0, nullptr);
+    }
     if (length <= 0)
     {
         return OT_ERROR_FAILED;
@@ -119,7 +127,16 @@ otError GwInfoMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength
     Ip6::Address::InfoString addressString;
     int32_t length = MQTTSNDeserialize_gwinfo(&mGatewayId, &addressLength, &address, const_cast<unsigned char*>(aBuffer), aBufferLength);
     VerifyOrExit(length > 0, error = OT_ERROR_FAILED);
-    SuccessOrExit(addressString.Set("%.*s", static_cast<int32_t>(addressLength), address));
+    if (addressLength > 0)
+    {
+        SuccessOrExit(addressString.Set("%.*s", static_cast<int32_t>(addressLength), address));
+        mHasAddress = true;
+    }
+    else
+    {
+        mHasAddress = false;
+    }
+
     SuccessOrExit(error = mAddress.FromString(addressString.AsCString()));
 
 exit:
@@ -398,13 +415,129 @@ otError SubackMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength
     unsigned short topicId;
     unsigned char code;
     int qos;
-    if (MQTTSNDeserialize_suback(&qos, &topicId, &mMessageId, &code, const_cast<unsigned char*>(aBuffer), aBufferLength))
+    if (MQTTSNDeserialize_suback(&qos, &topicId, &mMessageId, &code, const_cast<unsigned char*>(aBuffer), aBufferLength) != 1)
     {
         return OT_ERROR_FAILED;
     }
     mTopicId = static_cast<TopicId>(topicId);
     mReturnCode = static_cast<ReturnCode>(code);
     mQos = static_cast<Qos>(qos);
+    return OT_ERROR_NONE;
+}
+
+otError UnsubscribeMessage::Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const
+{
+    MQTTSN_topicid topicId;
+    memset(&topicId, 0, sizeof(topicId));
+    topicId.type = MQTTSN_TOPIC_TYPE_NORMAL;
+    topicId.data.id = mTopicId;
+    int32_t length = MQTTSNSerialize_unsubscribe(aBuffer, aBufferLength, mMessageId, &topicId);
+    if (length <= 0)
+    {
+        return OT_ERROR_FAILED;
+    }
+    *aLength = length;
+    return OT_ERROR_NONE;
+}
+
+otError UnsubscribeMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength)
+{
+    MQTTSN_topicid topicId;
+    memset(&topicId, 0, sizeof(topicId));
+    if (MQTTSNDeserialize_unsubscribe(&mMessageId, &topicId, const_cast<unsigned char*>(aBuffer), aBufferLength) != 1)
+    {
+        return OT_ERROR_FAILED;
+    }
+    mTopicId = topicId.data.id;
+    return OT_ERROR_NONE;
+}
+
+otError UnsubackMessage::Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const
+{
+    int32_t length = MQTTSNSerialize_unsuback(aBuffer, aBufferLength, mMessageId);
+    if (length <= 0)
+    {
+        return OT_ERROR_FAILED;
+    }
+    *aLength = length;
+    return OT_ERROR_NONE;
+}
+
+otError UnsubackMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength)
+{
+    if (MQTTSNDeserialize_unsuback(&mMessageId, const_cast<unsigned char*>(aBuffer), aBufferLength) != 1)
+    {
+        return OT_ERROR_FAILED;
+    }
+    return OT_ERROR_NONE;
+}
+
+otError PingreqMessage::Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const
+{
+    MQTTSNString clientId = MQTTSNString_initializer;
+    clientId.cstring = const_cast<char*>(mClientId.AsCString());
+    int32_t length = MQTTSNSerialize_pingreq(aBuffer, aBufferLength, clientId);
+    if (length <= 0)
+    {
+        return OT_ERROR_FAILED;
+    }
+    *aLength = length;
+    return OT_ERROR_NONE;
+}
+
+otError PingreqMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength)
+{
+    otError error = OT_ERROR_NONE;
+    MQTTSNString clientId = MQTTSNString_initializer;
+    if (MQTTSNDeserialize_pingreq(&clientId, const_cast<unsigned char*>(aBuffer), aBufferLength) != 1)
+    {
+        return OT_ERROR_FAILED;
+    }
+    SuccessOrExit(error = mClientId.Set("%.*s", clientId.lenstring.len, clientId.lenstring.data));
+
+exit:
+    return error;
+}
+
+otError PingrespMessage::Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const
+{
+    int32_t length = MQTTSNSerialize_pingresp(aBuffer, aBufferLength);
+    if (length <= 0)
+    {
+        return OT_ERROR_FAILED;
+    }
+    *aLength = length;
+    return OT_ERROR_NONE;
+}
+
+otError PingrespMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength)
+{
+    if (MQTTSNDeserialize_pingresp(const_cast<unsigned char*>(aBuffer), aBufferLength) != 1)
+    {
+        return OT_ERROR_FAILED;
+    }
+    return OT_ERROR_NONE;
+}
+
+otError DisconnectMessage::Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const
+{
+    int32_t length = MQTTSNSerialize_disconnect(aBuffer, aBufferLength, mDuration);
+    if (length <= 0)
+    {
+        return OT_ERROR_FAILED;
+    }
+    *aLength = length;
+    return OT_ERROR_NONE;
+}
+
+otError DisconnectMessage::Deserialize(const uint8_t* aBuffer, int32_t aBufferLength)
+{
+    int duration;
+    if (MQTTSNDeserialize_disconnect(&duration, const_cast<unsigned char*>(aBuffer), aBufferLength) != 1)
+    {
+        return OT_ERROR_FAILED;
+    }
+    mDuration = duration;
     return OT_ERROR_NONE;
 }
 

@@ -98,7 +98,7 @@ class MessageMetadata
 public:
     MessageMetadata(void);
 
-    MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aPacketId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, CallbackType aCallback, void* aContext);
+    MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aMessageId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, CallbackType aCallback, void* aContext);
 
     otError AppendTo(Message &aMessage) const;
 
@@ -109,7 +109,7 @@ public:
 private:
     Ip6::Address mDestinationAddress;
     uint16_t mDestinationPort;
-    uint16_t mPacketId;
+    uint16_t mMessageId;
     uint32_t mTimestamp;
     uint32_t mRetransmissionTimeout;
     uint8_t mRetransmissionCount;
@@ -131,7 +131,7 @@ public:
 
     otError Dequeue(Message &aMessage);
 
-    Message* Find(uint16_t aPacketId, MessageMetadata<CallbackType> &aMetadata);
+    Message* Find(uint16_t aMessageId, MessageMetadata<CallbackType> &aMetadata);
 
     otError HandleTimer(void);
 
@@ -321,7 +321,7 @@ private:
 
     Ip6::UdpSocket mSocket;
     MqttsnConfig mConfig;
-    uint16_t mPacketId;
+    uint16_t mMessageId;
     uint32_t mPingReqTime;
     uint32_t mGwTimeout;
     bool mDisconnectRequested;

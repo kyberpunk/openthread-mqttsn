@@ -29,9 +29,6 @@
 #include <string.h>
 #include "mqttsn_client.hpp"
 #include "mqttsn_serializer.hpp"
-#include "MQTTSNPacket.h"
-#include "MQTTSNConnect.h"
-#include "MQTTSNSearch.h"
 #include "fsl_debug_console.h"
 
 #define MAX_PACKET_SIZE 255
@@ -51,10 +48,10 @@ MessageMetadata<CallbackType>::MessageMetadata()
 }
 
 template <typename CallbackType>
-MessageMetadata<CallbackType>::MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aPacketId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, CallbackType aCallback, void* aContext)
+MessageMetadata<CallbackType>::MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aMessageId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, CallbackType aCallback, void* aContext)
     : mDestinationAddress(aDestinationAddress)
     , mDestinationPort(aDestinationPort)
-    , mPacketId(aPacketId)
+    , mMessageId(aMessageId)
     , mTimestamp(aTimestamp)
     , mRetransmissionTimeout(aRetransmissionTimeout)
     , mRetransmissionCount(0)
@@ -120,13 +117,13 @@ otError WaitingMessagesQueue<CallbackType>::Dequeue(Message &aMessage)
 }
 
 template <typename CallbackType>
-Message* WaitingMessagesQueue<CallbackType>::Find(uint16_t aPacketId, MessageMetadata<CallbackType> &aMetadata)
+Message* WaitingMessagesQueue<CallbackType>::Find(uint16_t aMessageId, MessageMetadata<CallbackType> &aMetadata)
 {
     Message* message = mQueue.GetHead();
     while (message)
     {
         aMetadata.ReadFrom(*message);
-        if (aPacketId == aMetadata.mPacketId)
+        if (aMessageId == aMetadata.mMessageId)
         {
             return message;
         }
@@ -183,7 +180,7 @@ MqttsnClient::MqttsnClient(Instance& instance)
     : InstanceLocator(instance)
     , mSocket(GetInstance().GetThreadNetif().GetIp6().GetUdp())
     , mConfig()
-    , mPacketId(1)
+    , mMessageId(1)
     , mPingReqTime(0)
     , mGwTimeout(0)
     , mDisconnectRequested(false)
@@ -214,24 +211,6 @@ MqttsnClient::~MqttsnClient()
 {
     mSocket.Close();
     OnDisconnected();
-}
-
-static int32_t PacketDecode(unsigned char* aData, size_t aLength)
-{
-    int lenlen = 0;
-    int datalen = 0;
-
-    if (aLength < MQTTSN_MIN_PACKET_LENGTH)
-    {
-        return MQTTSNPACKET_READ_ERROR;
-    }
-
-    lenlen = MQTTSNPacket_decode(aData, aLength, &datalen);
-    if (datalen != static_cast<int>(aLength))
-    {
-        return MQTTSNPACKET_READ_ERROR;
-    }
-    return aData[lenlen]; // return the packet type
 }
 
 void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo)
@@ -268,17 +247,17 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
     }
     PRINTF("\r\n");
 
-    int32_t decodedPacketType = PacketDecode(data, length);
-    if (decodedPacketType == MQTTSNPACKET_READ_ERROR)
+    MessageType messageType;
+    if (MessageBase::DeserializeMessageType(data, length, &messageType))
     {
         return;
     }
-    PRINTF("Packet type: %d\r\n", decodedPacketType);
+    PRINTF("Message type: %d\r\n", messageType);
 
     // TODO: Refactor switch to use separate handle functions
-    switch (decodedPacketType)
+    switch (messageType)
     {
-    case MQTTSN_CONNACK:
+    case kTypeConnack:
     {
         if (!client->VerifyGatewayAddress(messageInfo))
         {
@@ -297,7 +276,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
     }
         break;
-    case MQTTSN_SUBACK:
+    case kTypeSuback:
     {
         if (client->mClientState != kStateActive)
         {
@@ -327,7 +306,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         client->mSubscribeQueue.Dequeue(*message);
     }
         break;
-    case MQTTSN_PUBLISH:
+    case kTypePublish:
     {
         if (client->mClientState != kStateActive && client->mClientState != kStateAwake)
         {
@@ -377,49 +356,36 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
     }
         break;
-    case MQTTSN_ADVERTISE:
+    case kTypeAdvertise:
     {
-        unsigned char gatewayId = 0;
-        unsigned short duration = 0;
-        if (MQTTSNDeserialize_advertise(&gatewayId, &duration, data, length) != 1)
+        AdvertiseMessage advertiseMessage;
+        if (advertiseMessage.Deserialize(data, length) != OT_ERROR_NONE)
         {
             break;
         }
         if (client->mAdvertiseCallback)
         {
-            client->mAdvertiseCallback(messageInfo.GetPeerAddr(), static_cast<uint8_t>(gatewayId),
-                static_cast<uint32_t>(duration), client->mAdvertiseContext);
+            client->mAdvertiseCallback(messageInfo.GetPeerAddr(), advertiseMessage.GetGatewayId(),
+                advertiseMessage.GetDuration(), client->mAdvertiseContext);
         }
     }
         break;
-    case MQTTSN_GWINFO:
+    case kTypeGwInfo:
     {
-        unsigned char gatewayId = 0;
-        unsigned short addressLength = 1;
-        unsigned char* addressText = nullptr;
-        if (MQTTSNDeserialize_gwinfo(&gatewayId, &addressLength, &addressText, data, length) != 1)
+        GwInfoMessage gwInfoMessage;
+        if (gwInfoMessage.Deserialize(data, length) != OT_ERROR_NONE)
         {
             break;
         }
         if (client->mSearchGwCallback)
         {
-            Ip6::Address address;
-            if (addressLength > 0)
-            {
-                char addressBuffer[40];
-                memset(addressBuffer, 0 ,sizeof(addressBuffer));
-                memcpy(addressBuffer, addressText, addressLength);
-                address.FromString(addressBuffer);
-            }
-            else
-            {
-                address = messageInfo.GetPeerAddr();
-            }
-            client->mSearchGwCallback(address, gatewayId, client->mSearchGwContext);
+            Ip6::Address address = (gwInfoMessage.GetHasAddress()) ? gwInfoMessage.GetAddress()
+                : messageInfo.GetPeerAddr();
+            client->mSearchGwCallback(address, gwInfoMessage.GetGatewayId(), client->mSearchGwContext);
         }
     }
         break;
-    case MQTTSN_REGACK:
+    case kTypeRegack:
     {
         if (client->mClientState != kStateActive)
         {
@@ -448,7 +414,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         client->mRegisterQueue.Dequeue(*message);
     }
         break;
-    case MQTTSN_REGISTER:
+    case kTypeRegister:
     {
         int32_t packetLength = -1;
         Message* message = nullptr;
@@ -463,33 +429,25 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             break;
         }
 
-        unsigned short topicId;
-        unsigned short packetId;
-        MQTTSNString topicName;
-        memset(&topicName, 0, sizeof(topicName));
-        if (MQTTSNDeserialize_register(&topicId, &packetId, &topicName, data, length) != 1)
+        RegisterMessage registerMessage;
+        if (registerMessage.Deserialize(data, length) != OT_ERROR_NONE)
         {
             break;
         }
         ReturnCode code = kCodeRejectedTopicId;
         if (client->mRegisterReceivedCallback)
         {
-            TopicNameString topicNameString("%.*s", topicName.lenstring, topicName.cstring);
-            code = client->mRegisterReceivedCallback(static_cast<TopicId>(topicId), topicNameString, client->mRegisterReceivedContext);
+            code = client->mRegisterReceivedCallback(registerMessage.GetTopicId(), registerMessage.GetTopicName(), client->mRegisterReceivedContext);
         }
 
-        packetLength = MQTTSNSerialize_regack(buffer, MAX_PACKET_SIZE, topicId, packetId, static_cast<unsigned char>(code));
-        if (packetLength <= 0)
-        {
-            break;
-        }
+        RegackMessage regackMessage(code, registerMessage.GetTopicId(), registerMessage.GetMessageId());
         if (client->NewMessage(&message, buffer, packetLength) != OT_ERROR_NONE ||
             client->SendMessage(*message) != OT_ERROR_NONE)
         {
             break;
         }
     }
-    case MQTTSN_PUBACK:
+    case kTypePuback:
     {
         if (client->mClientState != kStateActive)
         {
@@ -519,7 +477,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         client->mPublishQos1Queue.Dequeue(*message);
     }
         break;
-    case MQTTSN_UNSUBACK:
+    case kTypeUnsuback:
     {
         if (client->mClientState != kStateActive)
         {
@@ -530,13 +488,13 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             break;
         }
 
-        unsigned short packetId;
-        if (MQTTSNDeserialize_unsuback(&packetId, data, length) != 1)
+        UnsubackMessage unsubackMessage;
+        if (unsubackMessage.Deserialize(data, length) != OT_ERROR_NONE)
         {
             break;
         }
         MessageMetadata<UnsubscribeCallbackFunc> metadata;
-        Message* message = client->mUnsubscribeQueue.Find(packetId, metadata);
+        Message* message = client->mUnsubscribeQueue.Find(unsubackMessage.GetMessageId(), metadata);
         if (!message)
         {
             break;
@@ -548,10 +506,8 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         client->mUnsubscribeQueue.Dequeue(*message);
     }
         break;
-    case MQTTSN_PINGREQ:
+    case kTypePingreq:
     {
-        MQTTSNString clientId;
-        memset(&clientId, 0, sizeof(clientId));
         Message* message = nullptr;
         int32_t packetLength = -1;
         unsigned char buffer[MAX_PACKET_SIZE];
@@ -561,14 +517,14 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             break;
         }
 
-        if (MQTTSNDeserialize_pingreq(&clientId, data, length) != 1)
+        PingreqMessage pingreqMessage;
+        if (pingreqMessage.Deserialize(data, length) != OT_ERROR_NONE)
         {
             break;
         }
 
-
-        packetLength = MQTTSNSerialize_pingresp(buffer, MAX_PACKET_SIZE);
-        if (packetLength <= 0)
+        PingrespMessage pingrespMessage;
+        if (pingrespMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
         {
             break;
         }
@@ -579,13 +535,14 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
     }
         break;
-    case MQTTSN_PINGRESP:
+    case kTypePingresp:
     {
-        if (MQTTSNDeserialize_pingresp(data, length) != 1)
+        if (!client->VerifyGatewayAddress(messageInfo))
         {
             break;
         }
-        if (!client->VerifyGatewayAddress(messageInfo))
+        PingrespMessage pingrespMessage;
+        if (pingrespMessage.Deserialize(data, length) != OT_ERROR_NONE)
         {
             break;
         }
@@ -601,11 +558,11 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
     }
         break;
-    case MQTTSN_DISCONNECT:
+    case kTypeDisconnect:
     {
 
-        int duration;
-        if (MQTTSNDeserialize_disconnect(&duration, data, length) != 1)
+        DisconnectMessage disconnectMessage;
+        if (disconnectMessage.Deserialize(data, length))
         {
             break;
         }
@@ -753,7 +710,7 @@ otError MqttsnClient::Subscribe(const char* aTopicName, Qos aQos, SubscribeCallb
     int32_t length = -1;
     Ip6::MessageInfo messageInfo;
     Message *message = nullptr;
-    SubscribeMessage subscribeMessage(false, aQos, mPacketId, aTopicName);
+    SubscribeMessage subscribeMessage(false, aQos, mMessageId, aTopicName);
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive)
@@ -772,9 +729,9 @@ otError MqttsnClient::Subscribe(const char* aTopicName, Qos aQos, SubscribeCallb
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
     SuccessOrExit(error = mSubscribeQueue.EnqueueCopy(*message, message->GetLength(),
-        MessageMetadata<SubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mPacketId, TimerMilli::GetNow(),
+        MessageMetadata<SubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
             mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
-    mPacketId++;
+    mMessageId++;
 
 exit:
     return error;
@@ -785,7 +742,7 @@ otError MqttsnClient::Register(const char* aTopicName, RegisterCallbackFunc aCal
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
-    RegisterMessage registerMessage(0, mPacketId, aTopicName);
+    RegisterMessage registerMessage(0, mMessageId, aTopicName);
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive)
@@ -797,9 +754,9 @@ otError MqttsnClient::Register(const char* aTopicName, RegisterCallbackFunc aCal
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
     SuccessOrExit(error = mRegisterQueue.EnqueueCopy(*message, message->GetLength(),
-        MessageMetadata<RegisterCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mPacketId, TimerMilli::GetNow(),
+        MessageMetadata<RegisterCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
             mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
-    mPacketId++;
+    mMessageId++;
 
 exit:
     return error;
@@ -810,7 +767,7 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, T
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
-    PublishMessage publishMessage(false, false, aQos, mPacketId, aTopicId, aData, aLength);
+    PublishMessage publishMessage(false, false, aQos, mMessageId, aTopicId, aData, aLength);
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive)
@@ -831,10 +788,10 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, T
     if (aQos == Qos::kQos1)
     {
         SuccessOrExit(error = mPublishQos1Queue.EnqueueCopy(*message, message->GetLength(),
-            MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mPacketId, TimerMilli::GetNow(),
+            MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
                 mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
     }
-    mPacketId++;
+    mMessageId++;
 
 exit:
     return error;
@@ -845,6 +802,7 @@ otError MqttsnClient::Unsubscribe(TopicId aTopicId, UnsubscribeCallbackFunc aCal
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
+    UnsubscribeMessage unsubscribeMessage(aTopicId, mMessageId);
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive)
@@ -853,21 +811,13 @@ otError MqttsnClient::Unsubscribe(TopicId aTopicId, UnsubscribeCallbackFunc aCal
         goto exit;
     }
 
-    MQTTSN_topicid topic;
-    topic.type = MQTTSN_TOPIC_TYPE_NORMAL;
-    topic.data.id = static_cast<unsigned short>(aTopicId);
-    length = MQTTSNSerialize_unsubscribe(buffer, MAX_PACKET_SIZE, mPacketId, &topic);
-    if (length <= 0)
-    {
-        error = OT_ERROR_FAILED;
-        goto exit;
-    }
+    SuccessOrExit(error = unsubscribeMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
     SuccessOrExit(error = mUnsubscribeQueue.EnqueueCopy(*message, message->GetLength(),
-        MessageMetadata<UnsubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mPacketId, TimerMilli::GetNow(),
+        MessageMetadata<UnsubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
             mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
-    mPacketId++;
+    mMessageId++;
 
 exit:
     return error;
@@ -878,6 +828,7 @@ otError MqttsnClient::Disconnect()
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
+    DisconnectMessage disconnectMessage(0);
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive && mClientState != kStateAwake
@@ -887,12 +838,7 @@ otError MqttsnClient::Disconnect()
         goto exit;
     }
 
-    length = MQTTSNSerialize_disconnect(buffer, MAX_PACKET_SIZE, 0);
-    if (length <= 0)
-    {
-        error = OT_ERROR_FAILED;
-        goto exit;
-    }
+    SuccessOrExit(error = disconnectMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
 
@@ -908,6 +854,7 @@ otError MqttsnClient::Sleep(uint16_t aDuration)
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
+    DisconnectMessage disconnectMessage(aDuration);
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive && mClientState != kStateAwake && mClientState != kStateAsleep)
@@ -916,13 +863,7 @@ otError MqttsnClient::Sleep(uint16_t aDuration)
         goto exit;
     }
 
-    length = MQTTSNSerialize_disconnect(buffer, MAX_PACKET_SIZE, aDuration);
-    if (length <= 0)
-    {
-        error = OT_ERROR_FAILED;
-        goto exit;
-    }
-
+    SuccessOrExit(error = disconnectMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
 
@@ -955,15 +896,10 @@ otError MqttsnClient::SearchGateway(const Ip6::Address &aMulticastAddress, uint1
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
+    SearchGwMessage searchGwMessage(aRadius);
     unsigned char buffer[MAX_PACKET_SIZE];
 
-    length = MQTTSNSerialize_searchgw(buffer, MAX_PACKET_SIZE, aRadius);
-    if (length <= 0)
-    {
-        error = OT_ERROR_FAILED;
-        goto exit;
-    }
-
+    SuccessOrExit(error = searchGwMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message, aMulticastAddress, aPort, aRadius));
 
@@ -1076,6 +1012,7 @@ otError MqttsnClient::PingGateway()
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
+    PingreqMessage pingreqMessage(mConfig.GetClientId().AsCString());
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive && mClientState != kStateAwake)
@@ -1084,16 +1021,7 @@ otError MqttsnClient::PingGateway()
         goto exit;
     }
 
-    MQTTSNString clientId;
-    memset(&clientId, 0, sizeof(clientId));
-    clientId.cstring = const_cast<char *>(mConfig.GetClientId().AsCString());
-    length = MQTTSNSerialize_pingreq(buffer, MAX_PACKET_SIZE, clientId);
-
-    if (length <= 0)
-    {
-        error = OT_ERROR_FAILED;
-        goto exit;
-    }
+    SuccessOrExit(error = pingreqMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
 

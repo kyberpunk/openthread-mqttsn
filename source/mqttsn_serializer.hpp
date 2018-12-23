@@ -168,9 +168,10 @@ public:
         ;
     }
 
-    GwInfoMessage (uint8_t aGatewayId, const Ip6::Address &aAddress, int32_t aAddressLength)
+    GwInfoMessage (uint8_t aGatewayId, bool aHasAddress, const Ip6::Address &aAddress, int32_t aAddressLength)
         : MessageBase(kTypeGwInfo)
         , mGatewayId(aGatewayId)
+        , mHasAddress(aHasAddress)
         , mAddress(aAddress)
     {
         ;
@@ -179,6 +180,10 @@ public:
     uint8_t GetGatewayId() const { return mGatewayId; }
 
     void SetGatewayId(uint8_t aGatewayId) { mGatewayId = aGatewayId; }
+
+    bool GetHasAddress() { return mHasAddress; }
+
+    void SetHasAddress(bool aHasAddress) { mHasAddress = aHasAddress; }
 
     const Ip6::Address &GetAddress() const { return mAddress; }
 
@@ -190,6 +195,7 @@ public:
 
 private:
     uint8_t mGatewayId;
+    bool mHasAddress;
     Ip6::Address mAddress;
 };
 
