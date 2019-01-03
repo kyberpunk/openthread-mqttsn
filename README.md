@@ -3,7 +3,7 @@ This repository contains MQTT-SN client implementation based on OpenThread SDK. 
 
 For development purposes and better interoperability the repository contains terporarily whole project created by [MCUXpresso IDE](https://www.nxp.com/support/developer-resources/software-development-tools/mcuxpresso-software-and-tools/mcuxpresso-integrated-development-environment-ide:MCUXpresso-IDE).
 
-The project is in very early stage of development, it may change over time. Documentation and example Docker images will be released in January 2019. Library will be integrated into OT CLI example in the future.
+The project is in very early stage of development, it may change over time. Documentation will be released in January 2019. Library will be integrated into OT CLI example in the future.
 
 ## Examples
 
