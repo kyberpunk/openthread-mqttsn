@@ -37,8 +37,15 @@ sudo docker run -d --name otbr --sysctl "net.ipv6.conf.all.disable_ipv6=0 \
 NAT64 network prefix is set to ``2018:ff9b::/96`` because default prefix cannot be applied on devices in private network. Container is started in network ``test`` with IP address ``172.18.0.6``. You should set ``--ncp-path`` parameter accordingly to your host platform.
 
 #### kyberpunk/mosquitto
-Image contains custom build of [Eclipse Mosquitto](https://mosquitto.org/) MQTT broker. For demonstration purposes is broker configured to use no authentication and no security. Broker is listening on standard port 1883 which is also bound to host machine network interfaces.
+Image contains custom build of [Eclipse Mosquitto](https://mosquitto.org/) MQTT broker. For demonstration purposes is broker configured to use no authentication and no security. Broker is listening on standard port 1883 which is also bound to host machine network interfaces. Container IP address in Docker network is set to ``172.18.0.7``.
 
+```
+# Download OTBR image
+sudo docker pull kyberpunk/mosquitto
+
+# Run OTBR container
+sudo docker run -d --name mosquitto --net test --ip 172.18.0.7 --privileged -p 1883:1883 kyberpunk.azurecr.io/mosquitto
+```
 
 
 ## References
