@@ -5,6 +5,8 @@ For development purposes and better interoperability the repository contains ter
 
 The project is in very early stage of development, it may change over time. Documentation will be released in January 2019. Library will be integrated into OT CLI example in the future.
 
+## Library Description
+
 ## Examples
 
 ## Sample Application Build
