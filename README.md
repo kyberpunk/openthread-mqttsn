@@ -13,7 +13,7 @@ There are prepared public [Docker](https://www.docker.com/) images which can be 
 ### Prerequisities
 You should have installed Docker CE environment. Please follow [official guide](https://docs.docker.com/install/) for product installation and configuration.
 
-Create new network *test* with IP address 172.18.0.0 so specific IP addresses can be set to demonstration images.
+Create new network ``test`` with IP address ``172.18.0.0`` so specific IP addresses can be set to individual images.
 ```
 sudo docker network create --subnet=172.18.0.0/16 test
 ```
@@ -21,6 +21,20 @@ sudo docker network create --subnet=172.18.0.0/16 test
 ### Obtain and run demonstration images
 #### kyberpunk/border-router
 Image contains custom build of [OpenThread Border Router](https://github.com/openthread/borderrouter). OpenThread official image can be used instead. Image must run on computer with connected Thread NCP device. You can find documentation and more information on [project website](https://openthread.io/guides/border-router/docker/run).
+
+```
+# Download OTBR image
+sudo docker pull kyberpunk/border-router
+
+# Run OTBR container
+sudo docker run -d --name otbr --sysctl "net.ipv6.conf.all.disable_ipv6=0 \
+        net.ipv4.conf.all.forwarding=1 net.ipv6.conf.all.forwarding=1" \
+        -p 80:80 --dns=127.0.0.1 -it --volume \
+        /dev/ttyACM0:/dev/ttyACM0 --net test --ip 172.18.0.6 \
+        --privileged kyberpunk/border-router \
+        --ncp-path /dev/ttyACM0 --nat64-prefix "2018:ff9b::/96"
+```
+NAT64 network prefix is set to ``2018:ff9b::/96`` because default prefix cannot be applied on devices in private network. Container is started in network ``test`` with IP address ``172.18.0.6``. You should set ``--ncp-path`` parameter accordingly to your host platform.
 
 #### kyberpunk/mosquitto
 Image contains custom build of [Eclipse Mosquitto](https://mosquitto.org/) MQTT broker. For demonstration purposes is broker configured to use no authentication and no security. Broker is listening on standard port 1883 which is also bound to host machine network interfaces.
