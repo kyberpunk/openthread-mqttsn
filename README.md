@@ -29,7 +29,7 @@ Image contains custom build of [OpenThread Border Router](https://github.com/ope
 sudo docker pull kyberpunk/border-router
 
 # Run OTBR container
-sudo docker run -d --name otbr --sysctl "net.ipv6.conf.all.disable_ipv6=0 \
+sudo docker run -d --name border-router --sysctl "net.ipv6.conf.all.disable_ipv6=0 \
         net.ipv4.conf.all.forwarding=1 net.ipv6.conf.all.forwarding=1" \
         -p 80:80 --dns=127.0.0.1 -it --volume \
         /dev/ttyACM0:/dev/ttyACM0 --net test --ip 172.18.0.6 \
@@ -39,7 +39,7 @@ sudo docker run -d --name otbr --sysctl "net.ipv6.conf.all.disable_ipv6=0 \
 NAT64 network prefix is set to ``2018:ff9b::/96`` because default prefix cannot be applied on devices in private network. Container is started in network ``test`` with IP address ``172.18.0.6``. You should set ``--ncp-path`` parameter accordingly to your host platform.
 
 #### kyberpunk/mosquitto
-Image contains custom build of [Eclipse Mosquitto](https://mosquitto.org/) MQTT broker. For demonstration purposes is broker configured to use no authentication and no security. Broker is listening on standard port 1883 which is also bound to host machine network interfaces. Container IP address in Docker network is set to ``172.18.0.7``.
+Image contains custom build of [Eclipse Mosquitto](https://mosquitto.org/) MQTT broker. For demonstration purposes is broker configured to use no authentication and no security. Broker is listening on standard port 1883 which is also bound to host machine network interfaces. Container IP address in Docker network is set to ``172.18.0.7``. Any MQTT client can be used for testing MQTT-SN demonstration.
 
 ```
 # Download Mosquitto image
@@ -60,12 +60,23 @@ sudo docker pull kyberpunk/paho
 # Run container
 sudo docker run -d --name paho --privileged --net test --ip 172.18.0.8 \
         -p 10000:10000 -p 10000:10000/udp kyberpunk.azurecr.io/paho \
-        --broker-name 192.168.0.1 --broker-port 1883
+        --broker-name 172.18.0.7 --broker-port 1883
 ```
 
 Gateway is listening on port ``10000`` and can be reached from Thread network with IPv6 address ``2018:ff9b::ac12:8``. Listening port is also bound to host machine. Multicast cannot be used without more complex network configuration because the gateway is outside of Thread network. Gateway is connected to Mosquitto image described above. You can change broker instance with ``--broker-name`` and ``--broker-port`` parameters.
 
 #### kyberpunk/paho6
+Image contains build of [Eclipse Paho MQTT-SN gateway](https://github.com/eclipse/paho.mqtt-sn.embedded-c) which provides connection from MQTT-SN protocol to MQTT broker. This image uses UDP over IPv6 implementation. This sample is used for IPv6 multicast communication inside of Thread network so MQTT-SN multicast features can be tested.
+
+```
+# Download MQTT-SN Paho gateway image
+sudo docker pull kyberpunk/paho
+
+# Run container
+sudo docker run -d --name paho6 --privileged --net container:border-router \
+        kyberpunk.azurecr.io/paho --broker-name 172.18.0.7 --broker-port 1883
+```
+Container uses the same network devices as Border Router container. Gateway is listening on port ``10000`` on ``wpan0`` interface. Gateway can be discovered with MQTT-SN gateway discovery on well-known multicast address ``ff02::2``. Gateway cannot be reached on another interfaces.
 
 ## References
 * [OpenThread GitHub](https://github.com/openthread/openthread)
