@@ -7,6 +7,8 @@ The project is in very early stage of development, it may change over time. Docu
 
 ## Examples
 
+## Sample Application Build
+
 ## Demonstration
 There are prepared public [Docker](https://www.docker.com/) images which can be used for MQTT-SN communication demonstration. Images are built for ARM architecture and tested on [Raspberry Pi 3](https://www.raspberrypi.org/) platform.
 
@@ -40,13 +42,30 @@ NAT64 network prefix is set to ``2018:ff9b::/96`` because default prefix cannot 
 Image contains custom build of [Eclipse Mosquitto](https://mosquitto.org/) MQTT broker. For demonstration purposes is broker configured to use no authentication and no security. Broker is listening on standard port 1883 which is also bound to host machine network interfaces. Container IP address in Docker network is set to ``172.18.0.7``.
 
 ```
-# Download OTBR image
+# Download Mosquitto image
 sudo docker pull kyberpunk/mosquitto
 
-# Run OTBR container
-sudo docker run -d --name mosquitto --net test --ip 172.18.0.7 --privileged -p 1883:1883 kyberpunk.azurecr.io/mosquitto
+# Run container
+sudo docker run -d --name mosquitto --net test --ip 172.18.0.7 --privileged \
+        -p 1883:1883 kyberpunk.azurecr.io/mosquitto
 ```
 
+#### kyberpunk/paho
+Image contains build of [Eclipse Paho MQTT-SN gateway](https://github.com/eclipse/paho.mqtt-sn.embedded-c) which provides connection from MQTT-SN protocol to MQTT broker. Gateway implements MQTT-SN over UDP in IPv4 networks.
+
+```
+# Download MQTT-SN Paho gateway image
+sudo docker pull kyberpunk/paho
+
+# Run container
+sudo docker run -d --name paho --privileged --net test --ip 172.18.0.8 \
+        -p 10000:10000 -p 10000:10000/udp kyberpunk.azurecr.io/paho \
+        --broker-name 192.168.0.1 --broker-port 1883
+```
+
+Gateway is listening on port ``10000`` and can be reached from Thread network with IPv6 address ``2018:ff9b::ac12:8``. Listening port is also bound to host machine. Multicast cannot be used without more complex network configuration because the gateway is outside of Thread network. Gateway is connected to Mosquitto image described above. You can change broker instance with ``--broker-name`` and ``--broker-port`` parameters.
+
+#### kyberpunk/paho6
 
 ## References
 * [OpenThread GitHub](https://github.com/openthread/openthread)
