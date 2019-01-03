@@ -5,6 +5,28 @@ For development purposes and better interoperability the repository contains ter
 
 The project is in very early stage of development, it may change over time. Documentation and example Docker images will be released in January 2019. Library will be integrated into OT CLI example in the future.
 
+## Examples
+
+## Demonstration
+There are prepared public [Docker](https://www.docker.com/) images which can be used for MQTT-SN communication demonstration. Images are built for ARM architecture and tested on [Raspberry Pi 3](https://www.raspberrypi.org/) platform.
+
+### Prerequisities
+You should have installed Docker CE environment. Please follow [official guide](https://docs.docker.com/install/) for product installation and configuration.
+
+Create new network *test* with IP address 172.18.0.0 so specific IP addresses can be set to demonstration images.
+```
+sudo docker network create --subnet=172.18.0.0/16 test
+```
+
+### Obtain and run demonstration images
+#### kyberpunk/border-router
+Image contains custom build of [OpenThread Border Router](https://github.com/openthread/borderrouter). OpenThread official image can be used instead. Image must run on computer with connected Thread NCP device. You can find documentation and more information on [project website](https://openthread.io/guides/border-router/docker/run).
+
+#### kyberpunk/mosquitto
+Image contains custom build of [Eclipse Mosquitto](https://mosquitto.org/) MQTT broker. For demonstration purposes is broker configured to use no authentication and no security. Broker is listening on standard port 1883 which is also bound to host machine network interfaces.
+
+
+
 ## References
 * [OpenThread GitHub](https://github.com/openthread/openthread)
 * [OpenThread Border Router GitHub](https://github.com/openthread/borderrouter)
