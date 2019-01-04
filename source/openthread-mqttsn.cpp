@@ -107,11 +107,19 @@ static void MqttsnDisconnectedCallback(ot::Mqttsn::DisconnectType aType, void* a
     sState = kThreadStarted;
 }
 
-static ot::Mqttsn::ReturnCode MqttsnReceived(const uint8_t* aPayload, int32_t aPayloadLength, ot::Mqttsn::TopicId topicId, void* aContext)
+static ot::Mqttsn::ReturnCode MqttsnReceived(const uint8_t* aPayload, int32_t aPayloadLength, ot::Mqttsn::TopicIdType aTopicIdType, ot::Mqttsn::TopicId aTopicId, ot::Mqttsn::ShortTopicNameString aShortTopicName, void* aContext)
 {
     OT_UNUSED_VARIABLE(aContext);
 
-    PRINTF("Message received from topic %d.\r\n", topicId);
+    if (aTopicIdType == ot::Mqttsn::kTopicId)
+    {
+        PRINTF("Message received from topic %d.\r\n", aTopicId);
+    }
+    else if (aTopicIdType == ot::Mqttsn::kShortTopicName)
+    {
+        PRINTF("Message received from topic %s.\r\n", aShortTopicName);
+    }
+
     for (int i = 0; i < aPayloadLength; i++)
     {
         PRINTF("%c", static_cast<int8_t>(aPayload[i]));
@@ -182,7 +190,7 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::To
 
 static void MqttsnSubscribe()
 {
-    sClient->Subscribe(DEFAULT_TOPIC, ot::Mqttsn::Qos::kQos1, MqttsnSubscribeCallback, nullptr);
+    sClient->Subscribe(DEFAULT_TOPIC, false, ot::Mqttsn::Qos::kQos1, MqttsnSubscribeCallback, nullptr);
     PRINTF("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
 }
 

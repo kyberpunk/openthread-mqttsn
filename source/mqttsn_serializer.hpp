@@ -362,13 +362,15 @@ public:
         ;
     }
 
-    PublishMessage(bool aDupFlag, bool aRetainedFlag, Qos aQos, uint16_t aMessageId, TopicId aTopicId, const uint8_t* aPayload, int32_t aPayloadLength)
+    PublishMessage(bool aDupFlag, bool aRetainedFlag, Qos aQos, uint16_t aMessageId, TopicIdType aTopicIdType, TopicId aTopicId, const char* aShortTopicName, const uint8_t* aPayload, int32_t aPayloadLength)
         : MessageBase(kTypePublish)
         , mDupFlag(aDupFlag)
         , mRetainedFlag(aRetainedFlag)
         , mQos(aQos)
         , mMessageId(aMessageId)
+        , mTopicIdType(aTopicIdType)
         , mTopicId(aTopicId)
+        , mShortTopicName("%s", aShortTopicName)
         , mPayload(aPayload)
         , mPayloadLength(aPayloadLength)
     {
@@ -391,9 +393,17 @@ public:
 
     void SetMessageId(uint16_t aMessageId) { mMessageId = aMessageId; }
 
+    TopicIdType GetTopicIdType() const { return mTopicIdType; }
+
+    void SetTopicIdType(TopicIdType aTopicIdType) { mTopicIdType = aTopicIdType; }
+
     TopicId GetTopicId() const { return mTopicId; }
 
     void SetTopicId(TopicId aTopicId) { mTopicId = aTopicId; }
+
+    ShortTopicNameString GetShortTopicName() const { return mShortTopicName; }
+
+    void SetShortTopicName(const char* aShortTopicName) { mShortTopicName.Set("%s", aShortTopicName); }
 
     const uint8_t* GetPayload() const { return mPayload; }
 
@@ -412,7 +422,9 @@ private:
     bool mRetainedFlag;
     Qos mQos;
     uint16_t mMessageId;
+    TopicIdType mTopicIdType;
     TopicId mTopicId;
+    ShortTopicNameString mShortTopicName;
     const uint8_t* mPayload;
     int32_t mPayloadLength;
 };
@@ -550,11 +562,14 @@ public:
         ;
     }
 
-    SubscribeMessage(bool aDupFlag, Qos aQos, uint16_t aMessageId, const char* aTopicName)
+    SubscribeMessage(bool aDupFlag, Qos aQos, uint16_t aMessageId, TopicIdType aTopicIdType, TopicId aTopicId, const char* aShortTopicName, const char* aTopicName)
         : MessageBase(kTypeSubscribe)
         , mDupFlag(aDupFlag)
         , mQos(aQos)
         , mMessageId(aMessageId)
+        , mTopicIdType(aTopicIdType)
+        , mTopicId(aTopicId)
+        , mShortTopicName("%s", aShortTopicName)
         , mTopicName("%s", aTopicName)
     {
         ;
@@ -568,6 +583,18 @@ public:
 
     void SetMessageId(uint16_t aMessageId) { mMessageId = aMessageId; }
 
+    TopicIdType GetTopicIdType() const { return mTopicIdType; }
+
+    void SetTopicIdType(TopicIdType aTopicIdType) { mTopicIdType = aTopicIdType; }
+
+    TopicId GetTopicId() const { return mTopicId; }
+
+    void SetTopicId(TopicId aTopicId) { mTopicId = aTopicId; }
+
+    const ShortTopicNameString &GetShortTopicName() const { return mShortTopicName; }
+
+    void SetShortTopicName(const char* aShortTopicName) { mShortTopicName.Set("%s", aShortTopicName); }
+
     const TopicNameString &GetTopicName() const { return mTopicName; }
 
     void SetTopicName(const char* aTopicName) { mTopicName.Set("%s", aTopicName); }
@@ -580,6 +607,9 @@ private:
     bool mDupFlag;
     Qos mQos;
     uint16_t mMessageId;
+    TopicIdType mTopicIdType;
+    TopicId mTopicId;
+    ShortTopicNameString mShortTopicName;
     TopicNameString mTopicName;
 };
 
@@ -637,29 +667,41 @@ public:
         ;
     }
 
-    UnsubscribeMessage (TopicId aTopicId, uint16_t aMessageId)
+    UnsubscribeMessage (uint16_t aMessageId, TopicIdType aTopicIdType, TopicId aTopicId, const char* aShortTopicName)
         : MessageBase(kTypeUnsubscribe)
-        , mTopicId(aTopicId)
         , mMessageId(aMessageId)
+        , mTopicIdType(aTopicIdType)
+        , mTopicId(aTopicId)
+        , mShortTopicName("%s", aShortTopicName)
     {
         ;
     }
+
+    uint16_t GetMessageId() const { return mMessageId; }
+
+    void SetMessageId(uint16_t aMessageId) { mMessageId = aMessageId; }
+
+    TopicIdType GetTopicIdType() const { return mTopicIdType; }
+
+    void SetTopicIdType(TopicIdType aTopicIdType) { mTopicIdType = aTopicIdType; }
 
     TopicId GetTopicId() const { return mTopicId; }
 
     void SetTopicId(TopicId aTopicId) { mTopicId = aTopicId; }
 
-    uint16_t GetMessageId() const { return mMessageId; }
+    ShortTopicNameString GetShortTopicName() { return mShortTopicName; }
 
-    void SetMessageId(uint16_t aMessageId) { mMessageId = aMessageId; }
+    void SetShortTopicName(const char* aShortTopicName) { mShortTopicName.Set("%s", aShortTopicName); }
 
     otError Serialize(uint8_t* aBuffer, uint8_t aBufferLength, int32_t* aLength) const;
 
     otError Deserialize(const uint8_t* aBuffer, int32_t aBufferLength);
 
 private:
-    TopicId mTopicId;
     uint16_t mMessageId;
+    TopicIdType mTopicIdType;
+    TopicId mTopicId;
+    ShortTopicNameString mShortTopicName;
 };
 
 class UnsubackMessage : public MessageBase
