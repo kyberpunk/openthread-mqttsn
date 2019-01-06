@@ -77,10 +77,20 @@ enum
 {
     kCliendIdStringMax = 24,
     kMaxTopicPayloadLength = 255,
-    kMaxTopicNameLength = 50
+    kMaxTopicNameLength = 50,
+    kShortTopicNameLength = 3
+};
+
+enum TopicIdType
+{
+    kTopicId,
+    kShortTopicName,
+    kTopicName
 };
 
 typedef uint16_t TopicId;
+
+typedef String<kShortTopicNameLength> ShortTopicNameString;
 
 typedef String<kMaxTopicNameLength> TopicNameString;
 
@@ -235,7 +245,7 @@ public:
 
     typedef void (*SubscribeCallbackFunc)(ReturnCode aCode, TopicId topicId, Qos aQos, void* aContext);
 
-    typedef ReturnCode (*PublishReceivedCallbackFunc)(const uint8_t* aPayload, int32_t aPayloadLength, TopicId aTopicId, void* aContext);
+    typedef ReturnCode (*PublishReceivedCallbackFunc)(const uint8_t* aPayload, int32_t aPayloadLength, TopicIdType aTopicIdType, TopicId aTopicId, ShortTopicNameString aShortTopicName, void* aContext);
 
     typedef void (*AdvertiseCallbackFunc)(const Ip6::Address &aAddress, uint8_t aGatewayId, uint32_t aDuration, void* aContext);
 
@@ -263,12 +273,17 @@ public:
 
     otError Connect(MqttsnConfig &aConfig);
 
-    // TODO: Overload for other topic types
-    otError Subscribe(const char* aTopicName, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext);
+    otError Subscribe(const char* aTopicName, bool aIsShortTopicName, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext);
+
+    otError Subscribe(TopicId aTopicId, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext);
 
     otError Register(const char* aTopicName, RegisterCallbackFunc aCallback, void* aContext);
 
+    otError Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, const char* aShortTopicName, PublishCallbackFunc aCallback, void* aContext);
+
     otError Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, TopicId aTopicId, PublishCallbackFunc aCallback, void* aContext);
+
+    otError Unsubscribe(const char* aShortTopicName, UnsubscribeCallbackFunc aCallback, void* aContext);
 
     otError Unsubscribe(TopicId aTopicId, UnsubscribeCallbackFunc aCallback, void* aContext);
 

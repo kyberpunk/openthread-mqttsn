@@ -324,7 +324,8 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         if (client->mPublishReceivedCallback)
         {
             code = client->mPublishReceivedCallback(publishMessage.GetPayload(), publishMessage.GetPayloadLength(),
-                publishMessage.GetTopicId(), client->mPublishReceivedContext);
+                publishMessage.GetTopicIdType(), publishMessage.GetTopicId(), publishMessage.GetShortTopicName(),
+                client->mPublishReceivedContext);
         }
 
         if (publishMessage.GetQos() == kQos0)
@@ -703,13 +704,52 @@ exit:
     return error;
 }
 
-otError MqttsnClient::Subscribe(const char* aTopicName, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext)
+otError MqttsnClient::Subscribe(const char* aTopicName, bool aIsShortTopicName, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext)
 {
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Ip6::MessageInfo messageInfo;
     Message *message = nullptr;
-    SubscribeMessage subscribeMessage(false, aQos, mMessageId, aTopicName);
+    int32_t topicNameLength = strlen(aTopicName);
+    SubscribeMessage subscribeMessage;
+    VerifyOrExit(topicNameLength > 0, error = OT_ERROR_INVALID_ARGS);
+    VerifyOrExit(!aIsShortTopicName || length <= 2, error = OT_ERROR_INVALID_ARGS);
+    subscribeMessage = aIsShortTopicName ?
+        SubscribeMessage(false, aQos, mMessageId, kShortTopicName, 0, aTopicName, "")
+        : SubscribeMessage(false, aQos, mMessageId, kTopicName, 0, "", aTopicName);
+    unsigned char buffer[MAX_PACKET_SIZE];
+
+    if (mClientState != kStateActive)
+    {
+        error = OT_ERROR_INVALID_STATE;
+        goto exit;
+    }
+
+    if (aQos != kQos0 && aQos != kQos1)
+    {
+        error = OT_ERROR_NOT_IMPLEMENTED;
+        goto exit;
+    }
+
+    SuccessOrExit(error = subscribeMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
+    SuccessOrExit(error = NewMessage(&message, buffer, length));
+    SuccessOrExit(error = SendMessage(*message));
+    SuccessOrExit(error = mSubscribeQueue.EnqueueCopy(*message, message->GetLength(),
+        MessageMetadata<SubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
+            mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+    mMessageId++;
+
+exit:
+    return error;
+}
+
+otError MqttsnClient::Subscribe(TopicId aTopicId, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext)
+{
+    otError error = OT_ERROR_NONE;
+    int32_t length = -1;
+    Ip6::MessageInfo messageInfo;
+    Message *message = nullptr;
+    SubscribeMessage subscribeMessage(false, aQos, mMessageId, kShortTopicName, aTopicId, "", "");
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive)
@@ -761,12 +801,15 @@ exit:
     return error;
 }
 
-otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, TopicId aTopicId, PublishCallbackFunc aCallback, void* aContext)
+otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, const char* aShortTopicName, PublishCallbackFunc aCallback, void* aContext)
 {
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
-    PublishMessage publishMessage(false, false, aQos, mMessageId, aTopicId, aData, aLength);
+    int32_t topicNameLength = strlen(aShortTopicName);
+    PublishMessage publishMessage;
+    VerifyOrExit(topicNameLength > 0 && topicNameLength <= 2, error = OT_ERROR_INVALID_ARGS);
+    publishMessage = PublishMessage(false, false, aQos, mMessageId, kShortTopicName, 0, aShortTopicName, aData, aLenght);
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive)
@@ -796,12 +839,76 @@ exit:
     return error;
 }
 
+otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, TopicId aTopicId, PublishCallbackFunc aCallback, void* aContext)
+{
+    otError error = OT_ERROR_NONE;
+    int32_t length = -1;
+    Message* message = nullptr;
+    PublishMessage publishMessage(false, false, aQos, mMessageId, kTopicId, aTopicId, "", aData, aLength);
+    unsigned char buffer[MAX_PACKET_SIZE];
+
+    if (mClientState != kStateActive)
+    {
+        error = OT_ERROR_INVALID_STATE;
+        goto exit;
+    }
+
+    if (aQos != Qos::kQos0 && aQos != Qos::kQos1)
+    {
+        error = OT_ERROR_NOT_IMPLEMENTED;
+        goto exit;
+    }
+
+    SuccessOrExit(error = publishMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
+    SuccessOrExit(error = NewMessage(&message, buffer, length));
+    SuccessOrExit(error = SendMessage(*message));
+    if (aQos == Qos::kQos1)
+    {
+        SuccessOrExit(error = mPublishQos1Queue.EnqueueCopy(*message, message->GetLength(),
+            MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
+                mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+    }
+    mMessageId++;
+
+exit:
+    return error;
+}
+
+otError MqttsnClient::Unsubscribe(const char* aShortTopicName, UnsubscribeCallbackFunc aCallback, void* aContext)
+{
+    otError error = OT_ERROR_NONE;
+    int32_t length = -1;
+    Message* message = nullptr;
+    int32_t topicNameLength = strlen(aShortTopicName);
+    UnsubscribeMessage unsubscribeMessage;
+    VerifyOrExit(topicNameLength > 0 && topicNameLength <= 2, error = OT_ERROR_INVALID_ARGS);
+    unsubscribeMessage = UnsubscribeMessage(mMessageId, kShortTopicName, 0, aShortTopicName);
+    unsigned char buffer[MAX_PACKET_SIZE];
+
+    if (mClientState != kStateActive)
+    {
+        error = OT_ERROR_INVALID_STATE;
+        goto exit;
+    }
+
+    SuccessOrExit(error = unsubscribeMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
+    SuccessOrExit(error = NewMessage(&message, buffer, length));
+    SuccessOrExit(error = SendMessage(*message));
+    SuccessOrExit(error = mUnsubscribeQueue.EnqueueCopy(*message, message->GetLength(),
+        MessageMetadata<UnsubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
+            mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+    mMessageId++;
+
+exit:
+    return error;
+}
+
 otError MqttsnClient::Unsubscribe(TopicId aTopicId, UnsubscribeCallbackFunc aCallback, void* aContext)
 {
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
     Message* message = nullptr;
-    UnsubscribeMessage unsubscribeMessage(aTopicId, mMessageId);
+    UnsubscribeMessage unsubscribeMessage(mMessageId, kTopicId, aTopicId, "");
     unsigned char buffer[MAX_PACKET_SIZE];
 
     if (mClientState != kStateActive)

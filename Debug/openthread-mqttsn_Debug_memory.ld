@@ -1,11 +1,11 @@
 /*
  * GENERATED FILE - DO NOT EDIT
  * (c) Code Red Technologies Ltd, 2008-2013
- * (c) NXP Semiconductors 2013-2018
+ * (c) NXP Semiconductors 2013-2019
  * Generated linker script file for MKW41Z512xxx4
  * Created from memory.ldt by FMCreateLinkMemory
  * Using Freemarker v2.3.23
- * MCUXpresso IDE v10.2.1 [Build 795] [2018-07-25]  on 23.12.2018 15:27:44
+ * MCUXpresso IDE v10.2.1 [Build 795] [2018-07-25]  on Jan 4, 2019 1:28:02 PM
  */
 
 MEMORY
