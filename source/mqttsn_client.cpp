@@ -32,7 +32,6 @@
 #include "fsl_debug_console.h"
 
 #define MAX_PACKET_SIZE 255
-#define KEEP_ALIVE_DELAY 5
 #define MQTTSN_MIN_PACKET_LENGTH 2
 
 namespace ot {
@@ -698,7 +697,7 @@ otError MqttsnClient::Connect(MqttsnConfig &aConfig)
     mDisconnectRequested = false;
     mSleepRequested = false;
     mGwTimeout = TimerMilli::GetNow() + mConfig.GetRetransmissionTimeout() * 1000;
-    mPingReqTime = TimerMilli::GetNow() + mConfig.GetKeepAlive() * 1000;
+    mPingReqTime = TimerMilli::GetNow() + mConfig.GetKeepAlive() * 700;
 
 exit:
     return error;
@@ -996,7 +995,7 @@ otError MqttsnClient::SendMessage(Message &aMessage, const Ip6::Address &aAddres
 
     if (mClientState == kStateActive)
     {
-        mPingReqTime = TimerMilli::GetNow() + (mConfig.GetKeepAlive() - KEEP_ALIVE_DELAY) * 1000;
+        mPingReqTime = TimerMilli::GetNow() + mConfig.GetKeepAlive() * 700;
     }
 
 exit:
