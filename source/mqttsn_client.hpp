@@ -35,19 +35,33 @@
 #include "net/udp6.hpp"
 #include "openthread/error.h"
 
+/**
+ * @file
+ *   This file includes interface for MQTT-SN protocol v1.2 client.
+ */
+
 namespace ot {
 
 namespace Mqttsn {
 
+/**
+ * MQTT-SN message return code.
+ */
 enum ReturnCode
 {
     kCodeAccepted = 0,
     kCodeRejectedCongestion = 1,
     kCodeRejectedTopicId = 2,
     kCodeRejectedNotSupported = 3,
+    /**
+     * Pending message timed out. this value is not returned by gateway.
+     */
     kCodeTimeout = -1,
 };
 
+/**
+ * MQTT-SN quality of service level.
+ */
 enum Qos
 {
     kQos0 = 0x0,
@@ -56,49 +70,117 @@ enum Qos
     kQosm1 = 0x3
 };
 
+/**
+ * Disconnected state reason.
+ */
 enum DisconnectType
 {
+    /**
+     * Client was disconnected by gateway/broker.
+     */
     kServer,
+    /**
+     * Disconnection was invoked by client.
+     */
     kClient,
+    /**
+     * Client changed state to asleep
+     */
     kAsleep,
+    /**
+     * Communication timeout.
+     */
     kTimeout
 };
 
+/**
+ * Client lifecycle states.
+ */
 enum ClientState
 {
+    /**
+     * Client is not connected to gateway.
+     */
     kStateDisconnected,
+    /**
+     * Client is connected to gateway and currently alive.
+     */
     kStateActive,
+    /**
+     * Client is in sleeping state.
+     */
     kStateAsleep,
+    /**
+     * Client is awaken from sleep.
+     */
     kStateAwake,
+    /**
+     * Client connection is lost due to communication error.
+     */
     kStateLost,
 };
 
 enum
 {
+    /**
+     * Client ID maximal length.
+     */
     kCliendIdStringMax = 24,
-    kMaxTopicPayloadLength = 255,
+    /**
+     * Long topic name maximal length (with null terminator).
+     */
     kMaxTopicNameLength = 50,
+    /**
+     * Short topic maximal length (with null terminator).
+     */
     kShortTopicNameLength = 3
 };
 
+/**
+ * MQTT-SN topic identificator type.
+ */
 enum TopicIdType
 {
+    /**
+     * Predefined topic ID.
+     */
     kTopicId,
+    /**
+     * Two character short topic name.
+     */
     kShortTopicName,
+    /**
+     * Long topic name.
+     */
     kTopicName
 };
 
+/**
+ * Topic ID type.
+ */
 typedef uint16_t TopicId;
 
+/**
+ * Short topic name string.
+ */
 typedef String<kShortTopicNameLength> ShortTopicNameString;
 
+/**
+ * Long topic name string.
+ */
 typedef String<kMaxTopicNameLength> TopicNameString;
 
+/**
+ * Client ID string.
+ */
 typedef String<kCliendIdStringMax> ClientIdString;
 
 template <typename CallbackType>
 class WaitingMessagesQueue;
 
+/**
+ * Message metadata which are stored in waiting messages queue.
+ */
 template <typename CallbackType>
 class MessageMetadata
 {
@@ -110,10 +192,32 @@ public:
 
     MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aMessageId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, CallbackType aCallback, void* aContext);
 
+    /**
+     * Append metadata to the message.
+     *
+     * @param[in]  aMessage  A reference to the message.
+     *
+     * @retval OT_ERROR_NONE     Successfully appended the bytes.
+     * @retval OT_ERROR_NO_BUFS  Insufficient available buffers to grow the message.
+     *
+     */
     otError AppendTo(Message &aMessage) const;
 
+    /**
+     * Read metadata from the message.
+     *
+     * @param[in]  aMessage  A reference to the message.
+     *
+     * @returns The number of bytes read.
+     *
+     */
     uint16_t ReadFrom(Message &aMessage);
 
+    /**
+     * Get metadata length in bytes.
+     *
+     * @returns The number of bytes.
+     */
     uint16_t GetLength(void) const;
 
 private:
