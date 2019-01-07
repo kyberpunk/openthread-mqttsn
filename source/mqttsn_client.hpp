@@ -188,8 +188,23 @@ class MessageMetadata
     friend class WaitingMessagesQueue<CallbackType>;
 
 public:
+    /**
+     * Default constructor for the object.
+     *
+     */
     MessageMetadata(void);
 
+    /**
+     * This constructor initializes the object with specific values.
+     *
+     * @param[in]  aDestinationAddress     Reference of message destination IPv6 address.
+     * @param[in]  aDestinationPort        Message destination port.
+     * @param[in]  aMessageId              MQTT-SN Message ID.
+     * @param[in]  aTimestamp              Time stamp of message in milliseconds for timeout evaluation.
+     * @param[in]  aRetransmissionTimeout  Time in millisecond after which message is message timeout invoked.
+     * @param[in]  aCallback               Function pointer for handling message timeout.
+     * @param[in]  aContext                Pointer to callback passed to timeout callback.
+     */
     MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aMessageId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, CallbackType aCallback, void* aContext);
 
     /**
@@ -221,34 +236,108 @@ public:
     uint16_t GetLength(void) const;
 
 private:
+    /**
+     * Reference of message destination IPv6 address.
+     */
     Ip6::Address mDestinationAddress;
+    /**
+     * Message destination port.
+     */
     uint16_t mDestinationPort;
+    /**
+     * MQTT-SN Message ID.
+     */
     uint16_t mMessageId;
+    /**
+     * Time stamp of message in milliseconds for timeout evaluation.
+     */
     uint32_t mTimestamp;
+    /**
+     * Time in millisecond after which message is message timeout invoked.
+     */
     uint32_t mRetransmissionTimeout;
+    /**
+     * Message retransmission count.
+     */
     uint8_t mRetransmissionCount;
+    /**
+     * Function pointer for handling message timeout.
+     */
     CallbackType mCallback;
+    /**
+     * Pointer to callback passed to timeout callback.
+     */
     void* mContext;
 };
 
+/**
+ * Class represents the queue which contains messages waiting for acknowledgements from gateway.
+ */
 template <typename CallbackType>
 class WaitingMessagesQueue
 {
 public:
+    /**
+     * Declaration of function pointer which is used as timeout callback.
+     */
     typedef void (*TimeoutCallbackFunc)(const MessageMetadata<CallbackType> &aMetadata, void* aContext);
 
+    /**
+     * This constructor initializes the object with specific values.
+     *
+     * @param[in]  aTimeoutCallback  Function pointer to callback which is invoked on message timeout.
+     * @param[in]  aTimeoutContext   Pointer to context passed to timeout callback.
+     */
     WaitingMessagesQueue(TimeoutCallbackFunc aTimeoutCallback, void* aTimeoutContext);
 
+    /**
+     * Default object destructor.
+     *
+     */
     ~WaitingMessagesQueue(void);
 
+    /**
+     * Copy message data and enqueue message to waiting queue.
+     *
+     * @param[in]  aMessage   Reference to message object to be enqueued.
+     * @param[in]  aLength    Message length.
+     * @param[in]  aMetadata  Reference to message metadata.
+     *
+     * @retval OT_ERROR_NONE     Successfully enqueued the message.
+     * @retval OT_ERROR_NO_BUFS  Insufficient available buffers to copy or enqueue the message.
+     */
     otError EnqueueCopy(const Message &aMessage, uint16_t aLength, const MessageMetadata<CallbackType> &aMetadata);
 
+    /**
+     * Dequeue specific message from waiting queue.
+     *
+     * @param[in]  aMessage   Reference to message object to be dequeued.
+     *
+     * @retval OT_ERROR_NONE       Successfully dequeued the message.
+     * @retval OT_ERROR_NOT_FOUND  Message was not found in waiting queue.
+     */
     otError Dequeue(Message &aMessage);
 
+    /**
+     * Find message by message ID and read message metadata.
+     *
+     * @param[in]  aMessageId  Message ID.
+     * @param[out] aMetadata   Reference to initialized metadata object.
+     *
+     * @returns  If the message is found the message ID is returned or null otherwise.
+     */
     Message* Find(uint16_t aMessageId, MessageMetadata<CallbackType> &aMetadata);
 
+    /**
+     * Evaluate queued messages timeout and retransmission.
+     *
+     * @retval OT_ERROR_NONE  Timeouts were successfully processed.
+     */
     otError HandleTimer(void);
 
+    /**
+     * Force waiting messages timeout, invoke callback and empty queue.
+     */
     void ForceTimeout(void);
 
 private:
