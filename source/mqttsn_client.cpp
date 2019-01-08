@@ -624,7 +624,7 @@ exit:
 
 otError MqttsnClient::Stop()
 {
-    return mSocket.Close();
+    otError error = mSocket.Close();
     if (mClientState != kStateDisconnected && mClientState != kStateLost)
     {
         mClientState = kStateDisconnected;
@@ -634,6 +634,7 @@ otError MqttsnClient::Stop()
             mDisconnectedCallback(kClient, mDisconnectedContext);
         }
     }
+    return error;
 }
 
 otError MqttsnClient::Process()
@@ -992,7 +993,7 @@ otError MqttsnClient::Awake(uint32_t aTimeout)
     SuccessOrExit(error = PingGateway());
 
     mClientState = kStateAwake;
-    mGwTimeout = TimerMilli::GetNow() + aTimeout * 1000;
+    mGwTimeout = TimerMilli::GetNow() + aTimeout;
 exit:
     return error;
 }

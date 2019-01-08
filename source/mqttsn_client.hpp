@@ -38,6 +38,7 @@
 /**
  * @file
  *   This file includes interface for MQTT-SN protocol v1.2 client.
+ *
  */
 
 namespace ot {
@@ -46,6 +47,7 @@ namespace Mqttsn {
 
 /**
  * MQTT-SN message return code.
+ *
  */
 enum ReturnCode
 {
@@ -61,6 +63,7 @@ enum ReturnCode
 
 /**
  * MQTT-SN quality of service level.
+ *
  */
 enum Qos
 {
@@ -72,6 +75,7 @@ enum Qos
 
 /**
  * Disconnected state reason.
+ *
  */
 enum DisconnectType
 {
@@ -95,6 +99,7 @@ enum DisconnectType
 
 /**
  * Client lifecycle states.
+ *
  */
 enum ClientState
 {
@@ -124,14 +129,17 @@ enum
 {
     /**
      * Client ID maximal length.
+     *
      */
     kCliendIdStringMax = 24,
     /**
      * Long topic name maximal length (with null terminator).
+     *
      */
     kMaxTopicNameLength = 50,
     /**
      * Short topic maximal length (with null terminator).
+     *
      */
     kShortTopicNameLength = 3
 };
@@ -143,35 +151,42 @@ enum TopicIdType
 {
     /**
      * Predefined topic ID.
+     *
      */
     kTopicId,
     /**
      * Two character short topic name.
+     *
      */
     kShortTopicName,
     /**
      * Long topic name.
+     *
      */
     kTopicName
 };
 
 /**
  * Topic ID type.
+ *
  */
 typedef uint16_t TopicId;
 
 /**
  * Short topic name string.
+ *
  */
 typedef String<kShortTopicNameLength> ShortTopicNameString;
 
 /**
  * Long topic name string.
+ *
  */
 typedef String<kMaxTopicNameLength> TopicNameString;
 
 /**
  * Client ID string.
+ *
  */
 typedef String<kCliendIdStringMax> ClientIdString;
 
@@ -180,6 +195,7 @@ class WaitingMessagesQueue;
 
 /**
  * Message metadata which are stored in waiting messages queue.
+ *
  */
 template <typename CallbackType>
 class MessageMetadata
@@ -197,13 +213,14 @@ public:
     /**
      * This constructor initializes the object with specific values.
      *
-     * @param[in]  aDestinationAddress     Reference of message destination IPv6 address.
+     * @param[in]  aDestinationAddress     A reference of message destination IPv6 address.
      * @param[in]  aDestinationPort        Message destination port.
      * @param[in]  aMessageId              MQTT-SN Message ID.
      * @param[in]  aTimestamp              Time stamp of message in milliseconds for timeout evaluation.
      * @param[in]  aRetransmissionTimeout  Time in millisecond after which message is message timeout invoked.
-     * @param[in]  aCallback               Function pointer for handling message timeout.
+     * @param[in]  aCallback               A function pointer for handling message timeout.
      * @param[in]  aContext                Pointer to callback passed to timeout callback.
+     *
      */
     MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aMessageId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, CallbackType aCallback, void* aContext);
 
@@ -232,61 +249,73 @@ public:
      * Get metadata length in bytes.
      *
      * @returns The number of bytes.
+     *
      */
     uint16_t GetLength(void) const;
 
 private:
     /**
-     * Reference of message destination IPv6 address.
+     * A reference of message destination IPv6 address.
+     *
      */
     Ip6::Address mDestinationAddress;
     /**
      * Message destination port.
+     *
      */
     uint16_t mDestinationPort;
     /**
      * MQTT-SN Message ID.
+     *
      */
     uint16_t mMessageId;
     /**
      * Time stamp of message in milliseconds for timeout evaluation.
+     *
      */
     uint32_t mTimestamp;
     /**
      * Time in millisecond after which message is message timeout invoked.
+     *
      */
     uint32_t mRetransmissionTimeout;
     /**
      * Message retransmission count.
+     *
      */
     uint8_t mRetransmissionCount;
     /**
-     * Function pointer for handling message timeout.
+     * A function pointer for handling message timeout.
+     *
      */
     CallbackType mCallback;
     /**
-     * Pointer to callback passed to timeout callback.
+     * A pointer to callback passed to timeout callback.
+     *
      */
     void* mContext;
 };
 
 /**
- * Class represents the queue which contains messages waiting for acknowledgements from gateway.
+ * The class represents the queue which contains messages waiting for acknowledgements from gateway.
+ *
  */
 template <typename CallbackType>
 class WaitingMessagesQueue
 {
 public:
     /**
-     * Declaration of function pointer which is used as timeout callback.
+     * Declaration of a function pointer which is used as timeout callback.
+     *
      */
     typedef void (*TimeoutCallbackFunc)(const MessageMetadata<CallbackType> &aMetadata, void* aContext);
 
     /**
      * This constructor initializes the object with specific values.
      *
-     * @param[in]  aTimeoutCallback  Function pointer to callback which is invoked on message timeout.
-     * @param[in]  aTimeoutContext   Pointer to context passed to timeout callback.
+     * @param[in]  aTimeoutCallback  A function pointer to callback which is invoked on message timeout.
+     * @param[in]  aTimeoutContext   A pointer to context passed to timeout callback.
+     *
      */
     WaitingMessagesQueue(TimeoutCallbackFunc aTimeoutCallback, void* aTimeoutContext);
 
@@ -299,22 +328,24 @@ public:
     /**
      * Copy message data and enqueue message to waiting queue.
      *
-     * @param[in]  aMessage   Reference to message object to be enqueued.
+     * @param[in]  aMessage   A reference to message object to be enqueued.
      * @param[in]  aLength    Message length.
-     * @param[in]  aMetadata  Reference to message metadata.
+     * @param[in]  aMetadata  A reference to message metadata.
      *
      * @retval OT_ERROR_NONE     Successfully enqueued the message.
      * @retval OT_ERROR_NO_BUFS  Insufficient available buffers to copy or enqueue the message.
+     *
      */
     otError EnqueueCopy(const Message &aMessage, uint16_t aLength, const MessageMetadata<CallbackType> &aMetadata);
 
     /**
      * Dequeue specific message from waiting queue.
      *
-     * @param[in]  aMessage   Reference to message object to be dequeued.
+     * @param[in]  aMessage   A reference to message object to be dequeued.
      *
      * @retval OT_ERROR_NONE       Successfully dequeued the message.
      * @retval OT_ERROR_NOT_FOUND  Message was not found in waiting queue.
+     *
      */
     otError Dequeue(Message &aMessage);
 
@@ -322,9 +353,10 @@ public:
      * Find message by message ID and read message metadata.
      *
      * @param[in]  aMessageId  Message ID.
-     * @param[out] aMetadata   Reference to initialized metadata object.
+     * @param[out] aMetadata   A reference to initialized metadata object.
      *
      * @returns  If the message is found the message ID is returned or null otherwise.
+     *
      */
     Message* Find(uint16_t aMessageId, MessageMetadata<CallbackType> &aMetadata);
 
@@ -332,11 +364,13 @@ public:
      * Evaluate queued messages timeout and retransmission.
      *
      * @retval OT_ERROR_NONE  Timeouts were successfully processed.
+     *
      */
     otError HandleTimer(void);
 
     /**
      * Force waiting messages timeout, invoke callback and empty queue.
+     *
      */
     void ForceTimeout(void);
 
@@ -346,10 +380,18 @@ private:
     void* mTimeoutContext;
 };
 
+/**
+ * This class contains MQTT-SN connection parameters.
+ *
+ */
 class MqttsnConfig
 {
 public:
 
+    /**
+     * Default constructor for the object.
+     *
+     */
     MqttsnConfig(void)
         : mAddress()
         , mPort()
@@ -361,61 +403,133 @@ public:
         ;
     }
 
+    /**
+     * Get gateway IPv6 address.
+     *
+     * @returns A reference to IPv6 address.
+     *
+     */
     const Ip6::Address &GetAddress()
     {
         return mAddress;
     }
 
+    /**
+     * Set gateway IPv6 address.
+     *
+     * @param[in]  aAddress  A reference to gateway IPv6 address.
+     *
+     */
     void SetAddress(const Ip6::Address &aAddress)
     {
         mAddress = aAddress;
     }
 
+    /**
+     * Get gateway interface port number.
+     *
+     * @returns Gateway port number.
+     *
+     */
     uint16_t GetPort()
     {
         return mPort;
     }
 
+    /**
+     * Set gateway interface port number.
+     *
+     * @param[in]  aPort  Gateway port number.
+     *
+     */
     void SetPort(uint16_t aPort)
     {
         mPort = aPort;
     }
 
+    /**
+     * Get client ID.
+     *
+     * @returns Cliend ID string.
+     *
+     */
     const ClientIdString &GetClientId()
     {
         return mClientId;
     }
 
+    /**
+     * Set client ID.
+     *
+     * @param[in]  aClientId  A pointer to client ID string.
+     *
+     */
     void SetClientId(const char* aClientId)
     {
         mClientId.Set("%s", aClientId);
     }
 
+    /**
+     * Get keepalive period in seconds.
+     *
+     * @returns Keepalive time in seconds.
+     *
+     */
     int16_t GetKeepAlive()
     {
         return mKeepAlive;
     }
 
+    /**
+     * Set keepalive period in seconds.
+     *
+     * @param[in]  Keepalive time in seconds.
+     *
+     */
     void SetKeepAlive(int16_t aDuration)
     {
         mKeepAlive = aDuration;
     }
 
+    /**
+     * Get clean session flag.
+     *
+     * @returns Clean session flag.
+     *
+     */
     bool GetCleanSession()
     {
         return mCleanSession;
     }
 
+    /**
+     * Set clean session flag.
+     *
+     * @param[in]  aCleanSession  Clean session flag.
+     *
+     */
     void SetCleanSession(bool aCleanSession)
     {
         mCleanSession = aCleanSession;
     }
 
+    /**
+     * Get retransmission timeout in milliseconds.
+     *
+     * @returns Retransmission timeout in milliseconds.
+     *
+     */
     uint32_t GetRetransmissionTimeout()
     {
         return mRetransmissionTimeout;
     }
 
+    /**
+     * Set retransmission timeout in milliseconds.
+     *
+     * @param[in]  aTimeout  Retransmission timeout value in milliseconds.
+     *
+     */
     void SetRetransmissionTimeout(uint32_t aTimeout)
     {
         mRetransmissionTimeout = aTimeout;
@@ -430,60 +544,312 @@ private:
     uint32_t mRetransmissionTimeout;
 };
 
+/**
+ * The class representing MQTT-SN protocol client.
+ *
+ */
 class MqttsnClient: public InstanceLocator
 {
 public:
-
+    /**
+     * Declaration of function for connection callback.
+     *
+     * @param[in]  aCode     CONNACK return code value or -1 when connection establishment timed out.
+     * @param[in]  aContext  A pointer to connection callback context object.
+     *
+     */
     typedef void (*ConnectCallbackFunc)(ReturnCode aCode, void* aContext);
 
-    typedef void (*SubscribeCallbackFunc)(ReturnCode aCode, TopicId topicId, Qos aQos, void* aContext);
+    /**
+     * Declaration of function for subscribe callback.
+     *
+     * @param[in]  aCode     SUBACK return code or -1 when subscription timed out.
+     * @param[in]  aTopicId  Subscribed topic ID. The value is 0 when timed out or subscribed by short topic name.
+     * @param[in]  aQos      Subscribed quality of service level.
+     * @param[in]  aContext  A pointer to subscription callback context object.
+     *
+     */
+    typedef void (*SubscribeCallbackFunc)(ReturnCode aCode, TopicId aTopicId, Qos aQos, void* aContext);
 
+    /**
+     * Declaration of function for callback invoked when publish message received.
+     *
+     * @param[in]  aPayload         A pointer to PUBLISH message payload byte array.
+     * @param[in]  aPayloadLength   PUBLISH message payload length.
+     * @param[in]  aTopicIdType     Topic ID type. Possible values are kTopicId or kShortTopicName.
+     * @param[in]  aTopicId         PUBLISH message topic ID. It is set only when aTopicIdType is kTopicId.
+     * @param[in]  aShortTopicName  PUBLISH message short topic name. It is set only when aTopicIdType is kShortTopicName.
+     * @param[in]  aContext         A pointer to publish received callback context object.
+     *
+     * @returns  Code to be send in response PUBACK message. Timeout value is not relevant.
+     */
     typedef ReturnCode (*PublishReceivedCallbackFunc)(const uint8_t* aPayload, int32_t aPayloadLength, TopicIdType aTopicIdType, TopicId aTopicId, ShortTopicNameString aShortTopicName, void* aContext);
 
+    /**
+     * Declaration of function for advertise callback.
+     *
+     * @param[in]  aAddress    A reference to advertised gateway IPv6 address.
+     * @param[in]  aGatewayId  Advertised gateway ID.
+     * @param[in]  aDuration   Advertise message duration parameter.
+     * @param[in]  aContext    A pointer to advertise callback context object.
+     *
+     */
     typedef void (*AdvertiseCallbackFunc)(const Ip6::Address &aAddress, uint8_t aGatewayId, uint32_t aDuration, void* aContext);
 
+    /**
+     * Declaration of function for search gateway callback.
+     *
+     * @param[in]  aAddress  A reference to IPv6 address of discovered gateway.
+     * @param[in]  aAddress  Discovered gateway ID.
+     * @param[in]  aContext  A pointer to search gateway context object.
+     *
+     */
     typedef void (*SearchGwCallbackFunc)(const Ip6::Address &aAddress, uint8_t aGatewayId, void* aContext);
 
+    /**
+     * Declaration of function for register callback.
+     *
+     * @param[in]  aCode     REGACK return code or -1 when subscription timed out.
+     * @param[in]  aTopicId  Registered topic ID.
+     * @param[in]  aContext  A pointer to register callback context object.
+     *
+     */
     typedef void (*RegisterCallbackFunc)(ReturnCode aCode, TopicId aTopicId, void* aContext);
 
+    /**
+     * Declaration of function for callback invoked when register message received.
+     *
+     * @param[in]  aTopicId    Registered topic ID.
+     * @param[in]  aTopicName  Long topic name string mapped to registered topic.
+     * @param[in]  aContext    A pointer to register received callback context object.
+     *
+     * @returns  Code to be send in response REGACK message. Timeout value is not relevant.
+     *
+     */
     typedef ReturnCode (*RegisterReceivedCallbackFunc)(TopicId aTopicId, const TopicNameString &aTopicName, void* aContext);
 
+    /**
+     * Declaration of function for publish callback. It is invoked only when quality of service level is 1 or 2.
+     *
+     * @param[in]  aCode     Publish response code or -1 when publish timed out.
+     * @param[in]  aTopicId  Topic ID of published message. It is set to 0 when timed out or short topic name is used.
+     * @param[in]  aContext  A pointer to publish callback context object.
+     *
+     */
     typedef void (*PublishCallbackFunc)(ReturnCode aCode, TopicId aTopicId, void* aContext);
 
+    /**
+     * Declaration of function for unsubscribe callback.
+     *
+     * @param[in]  aCode     UNSUBACK response code or -1 when publish timed out.
+     * @param[in]  aContext  A pointer to unsubscribe callback context object.
+     *
+     */
     typedef void (*UnsubscribeCallbackFunc)(ReturnCode aCode, void* aContext);
 
+    /**
+     * Declaration of function for disconnection callback.
+     *
+     * @param[in]  aType     Disconnection reason.
+     * @param[in]  aContext  A pointer to disconnection callback context object.
+     *
+     */
     typedef void (*DisconnectedCallbackFunc)(DisconnectType aType, void* aContext);
 
+    /**
+     * This constructor initializes the object.
+     *
+     * @param[in]  aInstance  A reference to the OpenThread instance.
+     *
+     */
     MqttsnClient(Instance &aInstance);
 
+    /**
+     * Default object destructor.
+     *
+     */
     ~MqttsnClient(void);
 
+    /**
+     * Start MQTT-SN service and start connection and listening.
+     *
+     * @param[in]  aPort  MQTT-SN client listening port.
+     *
+     * @retval OT_ERROR_NONE  Successfully started the service.
+     *
+     */
     otError Start(uint16_t aPort);
 
+    /**
+     * Stop MQTT-SN service.
+     *
+     * @retval OT_ERROR_NONE  Successfully stopped the service.
+     *
+     */
     otError Stop(void);
 
+    /**
+     * Process service workers.
+     *
+     * @retval OT_ERROR_NONE  Successfully processed.
+     *
+     */
     otError Process(void);
 
+    /**
+     * Establish MQTT-SN connection with gateway.
+     *
+     * @param[in]  aConfig  A reference to configuration object with connection parameters.
+     *
+     * @retval OT_ERROR_NONE           Connection message successfully queued.
+     * @retval OT_ERROR_INVALID_ARGS   Invalid connection parameters.
+     * @retval OT_ERROR_INVALID_STATE  The client is in invalid state. It must be disconnected before new connection establishment.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     *
+     */
     otError Connect(MqttsnConfig &aConfig);
 
+    /**
+     * Subscribe to the topic by topic name string.
+     *
+     * @param[in]  aTopicName         A pointer to long topic name string.
+     * @param[in]  aIsShortTopicName  Set to true when subscribing by long topic name or false in case of short topic name.
+     * @param[in]  aQos               Quality of service level to be subscribed.
+     * @param[in]  aCallback          A function pointer to callback which is invoked when subscription is acknowledged.
+     * @param[in]  aContext           A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE           Subscription message successfully queued.
+     * @retval OT_ERROR_INVALID_ARGS   Invalid subscription parameters.
+     * @retval OT_ERROR_INVALID_STATE  The client cannot connect in active state.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     *
+     */
     otError Subscribe(const char* aTopicName, bool aIsShortTopicName, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext);
 
+    /**
+     * Subscribe to the topic by topic ID.
+     *
+     * @param[in]  aTopicId   Topic ID to subscribe to.
+     * @param[in]  aCallback  A function pointer to callback which is invoked when subscription is acknowledged.
+     * @param[in]  aContext   A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE           Subscription message successfully queued.
+     * @retval OT_ERROR_INVALID_ARGS   Invalid subscription parameters.
+     * @retval OT_ERROR_INVALID_STATE  The client is not in active state.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     */
     otError Subscribe(TopicId aTopicId, Qos aQos, SubscribeCallbackFunc aCallback, void* aContext);
 
+    /**
+     * Register to topic with long topic name and obtain related topic ID.
+     *
+     * @param[in]  aTopicName  A pointer to long topic name string.
+     * @param[in]  aCallback   A function pointer to callback invoked when registration is acknowledged.
+     * @param[in]  aContext    A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE           Registration message successfully queued.
+     * @retval OT_ERROR_INVALID_STATE  The client is not in active state.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     *
+     */
     otError Register(const char* aTopicName, RegisterCallbackFunc aCallback, void* aContext);
 
+    /**
+     * Publish message to the topic with specific short topic name.
+     *
+     * @param[in]  aData            A pointer to byte array to be send as message payload.
+     * @param[in]  aLenght          Length of message payload data.
+     * @param[in]  aQos             Message quality of service level.
+     * @param[in]  aShortTopicName  A pointer to short topic name string of target topic.
+     * @param[in]  aCallback        A function pointer to callback invoked when registration is acknowledged.
+     * @param[in]  aContext         A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE           Publish message successfully queued.
+     * @retval OT_ERROR_INVALID_ARGS   Invalid publish parameters. Short topic name must have one or two characters.
+     * @retval OT_ERROR_INVALID_STATE  The client is not in active state.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     *
+     */
     otError Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, const char* aShortTopicName, PublishCallbackFunc aCallback, void* aContext);
 
+    /**
+     * Publish message to the topic with specific topic ID.
+     *
+     * @param[in]  aData      A pointer to byte array to be send as message payload.
+     * @param[in]  aLenght    Length of message payload data.
+     * @param[in]  aQos       Message quality of service level.
+     * @param[in]  aTopicId   Topic ID of target topic.
+     * @param[in]  aCallback  A function pointer to callback invoked when registration is acknowledged.
+     * @param[in]  aContext   A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE           Publish message successfully queued.
+     * @retval OT_ERROR_INVALID_STATE  The client is not in active state.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     *
+     */
     otError Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, TopicId aTopicId, PublishCallbackFunc aCallback, void* aContext);
 
+    /**
+     * Unsubscribe from the topic with specific short topic name.
+     *
+     * @param[in]  aShortTopicName  A pointer to short topic name string of target topic.
+     * @param[in]  aCallback        A function pointer to callback invoked when unsubscription is acknowledged.
+     * @param[in]  aContext         A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE           Unsubscribe message successfully queued.
+     * @retval OT_ERROR_INVALID_ARGS   Invalid unsubscribe parameters. Short topic name must have one or two characters.
+     * @retval OT_ERROR_INVALID_STATE  The client is not in active state.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     *
+     */
     otError Unsubscribe(const char* aShortTopicName, UnsubscribeCallbackFunc aCallback, void* aContext);
 
+    /**
+     * Unsubscribe from the topic with specific topic ID.
+     *
+     * @param[in]  aTopicId   A pointer to short topic name string of target topic.
+     * @param[in]  aCallback  A function pointer to callback invoked when unsubscription is acknowledged.
+     * @param[in]  aContext   A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE           Unsubscribe message successfully queued.
+     * @retval OT_ERROR_INVALID_STATE  The client is not in active state.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to unsubscribe.
+     *
+     */
     otError Unsubscribe(TopicId aTopicId, UnsubscribeCallbackFunc aCallback, void* aContext);
 
+    /**
+     * Disconnect MQTT-SN client from gateway.
+     *
+     * @retval OT_ERROR_NONE           Disconnection message successfully queued.
+     * @retval OT_ERROR_INVALID_STATE  The client is not in relevant state. It must be asleep, awake or active.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     *
+     */
     otError Disconnect(void);
 
+    /**
+     * Put the client into asleep state or change sleep duration. Client must be awaken or reconnected before duration time passes.
+     *
+     * @param[in]  aDuration  Duration time for which will the client stay in asleep state.
+     *
+     * @retval OT_ERROR_NONE           Sleep request successfully queued.
+     * @retval OT_ERROR_INVALID_STATE  The client is not in relevant state. It must be asleep, awake or active.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     *
+     */
     otError Sleep(uint16_t aDuration);
 
+    /**
+     * Awake the client and receive pending messages.
+     *
+     * @param[in] aTimeout Timeout in milliseconds for staying in awake state. PINGRESP message must be received before timeout time passes.
+     *
+     * @retval OT_ERROR_NONE           Awake request successfully queued.
+     * @retval OT_ERROR_INVALID_STATE  The client is not in relevant state. It must be asleep or awake.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     *
+     */
     otError Awake(uint32_t aTimeout);
 
     otError SearchGateway(const Ip6::Address &aMulticastAddress, uint16_t aPort, uint8_t aRadius);
