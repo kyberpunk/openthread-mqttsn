@@ -31,7 +31,21 @@
 #include "mqttsn_serializer.hpp"
 #include "fsl_debug_console.h"
 
+/**
+ * @file
+ *   This file includes implementation of MQTT-SN protocol v1.2 client.
+ *
+ */
+
+/**
+ * Maximal supported MQTT-SN message size in bytes.
+ *
+ */
 #define MAX_PACKET_SIZE 255
+/**
+ * Minimal MQTT-SN message size in bytes.
+ *
+ */
 #define MQTTSN_MIN_PACKET_LENGTH 2
 
 namespace ot {
@@ -142,10 +156,12 @@ otError WaitingMessagesQueue<CallbackType>::HandleTimer()
         message = message->GetNext();
         MessageMetadata<CallbackType> metadata;
         metadata.ReadFrom(*current);
+        // check if message timed out
         if (metadata.mTimestamp + metadata.mRetransmissionTimeout <= TimerMilli::GetNow())
         {
             if (mTimeoutCallback)
             {
+                // Invoke timeout callback
                 mTimeoutCallback(metadata, mTimeoutContext);
             }
             SuccessOrExit(error = Dequeue(*current));
@@ -190,7 +206,7 @@ MqttsnClient::MqttsnClient(Instance& instance)
     , mRegisterQueue(HandleRegisterTimeout, this)
     , mUnsubscribeQueue(HandleUnsubscribeTimeout, this)
     , mPublishQos1Queue(HandlePublishTimeout, this)
-    , mConnectCallback(nullptr)
+    , mConnectedCallback(nullptr)
     , mConnectContext(nullptr)
     , mPublishReceivedCallback(nullptr)
     , mPublishReceivedContext(nullptr)
@@ -218,6 +234,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
     Message &message = *static_cast<Message *>(aMessage);
     const Ip6::MessageInfo &messageInfo = *static_cast<const Ip6::MessageInfo *>(aMessageInfo);
 
+    // Read message content
     uint16_t offset = message.GetOffset();
     uint16_t length = message.GetLength() - message.GetOffset();
 
@@ -246,6 +263,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
     }
     PRINTF("\r\n");
 
+    // Determine message type
     MessageType messageType;
     if (MessageBase::DeserializeMessageType(data, length, &messageType))
     {
@@ -254,10 +272,13 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
     PRINTF("Message type: %d\r\n", messageType);
 
     // TODO: Refactor switch to use separate handle functions
+    // Handle received message type
     switch (messageType)
     {
+    // CONACK message
     case kTypeConnack:
     {
+        // Check source IPv6 address
         if (!client->VerifyGatewayAddress(messageInfo))
         {
             break;
@@ -269,18 +290,21 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
         client->mClientState = kStateActive;
         client->mGwTimeout = 0;
-        if (client->mConnectCallback)
+        if (client->mConnectedCallback)
         {
-            client->mConnectCallback(connackMessage.GetReturnCode(), client->mConnectContext);
+            client->mConnectedCallback(connackMessage.GetReturnCode(), client->mConnectContext);
         }
     }
         break;
+    // SUBACK message
     case kTypeSuback:
     {
+        // Client must be in active state
         if (client->mClientState != kStateActive)
         {
             break;
         }
+        // Check source IPv6 address
         if (!client->VerifyGatewayAddress(messageInfo))
         {
             break;
@@ -291,12 +315,14 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             break;
         }
 
+        // Find waiting message with corresponding ID
         MessageMetadata<SubscribeCallbackFunc> metadata;
         Message* message = client->mSubscribeQueue.Find(subackMessage.GetMessageId(), metadata);
         if (!message)
         {
             break;
         }
+        // Invoke callback and dequeue message
         if (metadata.mCallback)
         {
             metadata.mCallback(subackMessage.GetReturnCode(), subackMessage.GetTopicId(),
@@ -305,12 +331,15 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         client->mSubscribeQueue.Dequeue(*message);
     }
         break;
+    // PUBLISH message
     case kTypePublish:
     {
+        // Client must be in active or awake state to receive published messages
         if (client->mClientState != kStateActive && client->mClientState != kStateAwake)
         {
             break;
         }
+        // Check source IPv6 address
         if (!client->VerifyGatewayAddress(messageInfo))
         {
             break;
@@ -323,18 +352,21 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         ReturnCode code = kCodeRejectedTopicId;
         if (client->mPublishReceivedCallback)
         {
+            // Invoke callback
             code = client->mPublishReceivedCallback(publishMessage.GetPayload(), publishMessage.GetPayloadLength(),
                 publishMessage.GetTopicIdType(), publishMessage.GetTopicId(), publishMessage.GetShortTopicName(),
                 client->mPublishReceivedContext);
         }
 
+        // Handle QoS
         if (publishMessage.GetQos() == kQos0)
         {
-            // do nothing
+            // On QoS level 0 do nothing
             break;
         }
         else if (publishMessage.GetQos() == kQos1)
         {
+            // On QoS level 1  send PUBACK response
             int32_t packetLength = -1;
             Message* message = nullptr;
             unsigned char buffer[MAX_PACKET_SIZE];
@@ -351,11 +383,12 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
         else
         {
-            // not supported yet
+            // QoS levels 2 and -1 are not supported yet
             break;
         }
     }
         break;
+    // ADVERTISE message
     case kTypeAdvertise:
     {
         AdvertiseMessage advertiseMessage;
@@ -370,6 +403,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
     }
         break;
+    // GWINFO message
     case kTypeGwInfo:
     {
         GwInfoMessage gwInfoMessage;
@@ -385,12 +419,15 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
     }
         break;
+    // Regack message
     case kTypeRegack:
     {
+        // Client state must be active
         if (client->mClientState != kStateActive)
         {
             break;
         }
+        // Check source IPv6 address
         if (!client->VerifyGatewayAddress(messageInfo))
         {
             break;
@@ -401,12 +438,14 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
+        // Find waiting message with corresponding ID
         MessageMetadata<RegisterCallbackFunc> metadata;
         Message* message = client->mRegisterQueue.Find(regackMessage.GetMessageId(), metadata);
         if (!message)
         {
             break;
         }
+        // Invoke callback and dequeue message
         if (metadata.mCallback)
         {
             metadata.mCallback(regackMessage.GetReturnCode(), regackMessage.GetTopicId(), metadata.mContext);
@@ -414,12 +453,14 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         client->mRegisterQueue.Dequeue(*message);
     }
         break;
+    // REGISTER message
     case kTypeRegister:
     {
         int32_t packetLength = -1;
         Message* message = nullptr;
         unsigned char buffer[MAX_PACKET_SIZE];
 
+        // Client state must be active
         if (client->mClientState != kStateActive)
         {
             break;
@@ -434,12 +475,15 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
+
+        // Invoke register callback
         ReturnCode code = kCodeRejectedTopicId;
         if (client->mRegisterReceivedCallback)
         {
             code = client->mRegisterReceivedCallback(registerMessage.GetTopicId(), registerMessage.GetTopicName(), client->mRegisterReceivedContext);
         }
 
+        // Send REGACK response message
         RegackMessage regackMessage(code, registerMessage.GetTopicId(), registerMessage.GetMessageId());
         if (client->NewMessage(&message, buffer, packetLength) != OT_ERROR_NONE ||
             client->SendMessage(*message) != OT_ERROR_NONE)
@@ -447,12 +491,15 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             break;
         }
     }
+    // PUBACK message
     case kTypePuback:
     {
+        // Client state must be active
         if (client->mClientState != kStateActive)
         {
             break;
         }
+        // Check source IPv6 address.
         if (!client->VerifyGatewayAddress(messageInfo))
         {
             break;
@@ -463,26 +510,32 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
-        // Process Qos 1 message
+        // Process QoS level 1 message
+        // Find message waiting for acknowledge
         MessageMetadata<PublishCallbackFunc> metadata;
         Message* message = client->mPublishQos1Queue.Find(pubackMessage.GetMessageId(), metadata);
         if (!message)
         {
             break;
         }
+        // Invoke confirmation callback
         if (metadata.mCallback)
         {
             metadata.mCallback(pubackMessage.GetReturnCode(), pubackMessage.GetTopicId(), metadata.mContext);
         }
+        // Dequeue waiting message
         client->mPublishQos1Queue.Dequeue(*message);
     }
         break;
+    // UNSUBACK message
     case kTypeUnsuback:
     {
+        // Client state must be active
         if (client->mClientState != kStateActive)
         {
             break;
         }
+        // Check source IPv6 address
         if (!client->VerifyGatewayAddress(messageInfo))
         {
             break;
@@ -493,25 +546,30 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
+        // Find unsubscription message waiting for confirmation
         MessageMetadata<UnsubscribeCallbackFunc> metadata;
         Message* message = client->mUnsubscribeQueue.Find(unsubackMessage.GetMessageId(), metadata);
         if (!message)
         {
             break;
         }
+        // Invoke unsubscribe confirmation callback
         if (metadata.mCallback)
         {
             metadata.mCallback(kCodeAccepted, metadata.mContext);
         }
+        // Dequeue waiting message
         client->mUnsubscribeQueue.Dequeue(*message);
     }
         break;
+    // PINGREQ message
     case kTypePingreq:
     {
         Message* message = nullptr;
         int32_t packetLength = -1;
         unsigned char buffer[MAX_PACKET_SIZE];
 
+        // Client state must be active
         if (client->mClientState != kStateActive)
         {
             break;
@@ -523,6 +581,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             break;
         }
 
+        // Send PINGRESP message
         PingrespMessage pingrespMessage;
         if (pingrespMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
         {
@@ -535,8 +594,10 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
     }
         break;
+    // PINGRESP message
     case kTypePingresp:
     {
+        // Check source IPv6 address
         if (!client->VerifyGatewayAddress(messageInfo))
         {
             break;
@@ -547,7 +608,9 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             break;
         }
 
+        // Reset client timeout counter
         client->mGwTimeout = 0;
+        // If the client is awake PINRESP message put it into sleep again
         if (client->mClientState == kStateAwake)
         {
             client->mClientState = kStateAsleep;
@@ -558,6 +621,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
     }
         break;
+    // DISCONNECT message
     case kTypeDisconnect:
     {
 
@@ -566,9 +630,10 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
-        client->OnDisconnected();
 
         DisconnectType reason = kServer;
+
+        // Handle disconnection behavior depending on client state
         switch (client->mClientState)
         {
         case kStateActive:
@@ -576,16 +641,19 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         case kStateAsleep:
             if (client->mDisconnectRequested)
             {
+                // Regular disconnect
                 client->mClientState = kStateDisconnected;
                 reason = kServer;
             }
             else if (client->mSleepRequested)
             {
+                // Sleep state was requested - go asleep
                 client->mClientState = kStateAsleep;
                 reason = kAsleep;
             }
             else
             {
+                // Disconnected by gateway
                 client->mClientState = kStateDisconnected;
                 reason = kServer;
             }
@@ -593,11 +661,14 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         default:
             break;
         }
+        // Check source IPv6 address
         if (!client->VerifyGatewayAddress(messageInfo))
         {
             break;
         }
+        client->OnDisconnected();
 
+        // Invoke disconnected callback
         if (client->mDisconnectedCallback)
         {
             client->mDisconnectedCallback(reason, client->mDisconnectedContext);
@@ -615,7 +686,9 @@ otError MqttsnClient::Start(uint16_t aPort)
     Ip6::SockAddr sockaddr;
     sockaddr.mPort = aPort;
 
+    // Open UDP socket
     SuccessOrExit(error = mSocket.Open(MqttsnClient::HandleUdpReceive, this));
+    // Start listening on configured port
     SuccessOrExit(error = mSocket.Bind(sockaddr));
 
 exit:
@@ -625,9 +698,10 @@ exit:
 otError MqttsnClient::Stop()
 {
     otError error = mSocket.Close();
+    // Disconnect client if it is not disconnected already
+    mClientState = kStateDisconnected;
     if (mClientState != kStateDisconnected && mClientState != kStateLost)
     {
-        mClientState = kStateDisconnected;
         OnDisconnected();
         if (mDisconnectedCallback)
         {
@@ -643,14 +717,14 @@ otError MqttsnClient::Process()
 
     uint32_t now = TimerMilli::GetNow();
 
-    // Process pingreq
-    if (mClientState != kStateActive && mPingReqTime != 0 && mPingReqTime <= now)
+    // Process keep alive and send periodical PINGREQ message
+    if (mClientState == kStateActive && mPingReqTime != 0 && mPingReqTime <= now)
     {
         SuccessOrExit(error = PingGateway());
         mGwTimeout = TimerMilli::GetNow() + mConfig.GetRetransmissionTimeout() * 1000;
     }
 
-    // Handle timeout
+    // Set timeout flag when communication timed out
     if (mGwTimeout != 0 && mGwTimeout <= now)
     {
         mTimeoutRaised = true;
@@ -664,6 +738,7 @@ otError MqttsnClient::Process()
     SuccessOrExit(error = mPublishQos1Queue.HandleTimer());
 
 exit:
+    // Handle timeout
     if (mTimeoutRaised)
     {
         mClientState = kStateLost;
@@ -685,6 +760,7 @@ otError MqttsnClient::Connect(MqttsnConfig &aConfig)
     ConnectMessage connectMessage(mConfig.GetCleanSession(), false, mConfig.GetKeepAlive(), mConfig.GetClientId().AsCString());
     unsigned char buffer[MAX_PACKET_SIZE];
 
+    // Cannot connect in active state (already connected)
     if (mClientState == kStateActive)
     {
         error = OT_ERROR_INVALID_STATE;
@@ -692,13 +768,16 @@ otError MqttsnClient::Connect(MqttsnConfig &aConfig)
     }
     mConfig = aConfig;
 
+    // Serialize and send CONNECT message
     SuccessOrExit(error = connectMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
 
     mDisconnectRequested = false;
     mSleepRequested = false;
+    // Set timeout time
     mGwTimeout = TimerMilli::GetNow() + mConfig.GetRetransmissionTimeout() * 1000;
+    // Set next keepalive PINGREQ time
     mPingReqTime = TimerMilli::GetNow() + mConfig.GetKeepAlive() * 700;
 
 exit:
@@ -713,6 +792,7 @@ otError MqttsnClient::Subscribe(const char* aTopicName, bool aIsShortTopicName, 
     Message *message = nullptr;
     int32_t topicNameLength = strlen(aTopicName);
     SubscribeMessage subscribeMessage;
+    // Topic length must be 1 or 2
     VerifyOrExit(topicNameLength > 0, error = OT_ERROR_INVALID_ARGS);
     VerifyOrExit(!aIsShortTopicName || length <= 2, error = OT_ERROR_INVALID_ARGS);
     subscribeMessage = aIsShortTopicName ?
@@ -720,21 +800,33 @@ otError MqttsnClient::Subscribe(const char* aTopicName, bool aIsShortTopicName, 
         : SubscribeMessage(false, aQos, mMessageId, kTopicName, 0, "", aTopicName);
     unsigned char buffer[MAX_PACKET_SIZE];
 
+    // Client state must be active
     if (mClientState != kStateActive)
     {
         error = OT_ERROR_INVALID_STATE;
         goto exit;
     }
 
-    if (aQos != kQos0 && aQos != kQos1)
+    // Topic subscription is possible onlz for QoS levels 1, 2, 3
+    if (aQos != kQos0 || aQos != kQos1 || aQos != kQos2)
+    {
+        error = OT_ERROR_INVALID_ARGS;
+        goto exit;
+    }
+
+    // QoS 2 is not implemented
+    if (aQos == kQos2)
     {
         error = OT_ERROR_NOT_IMPLEMENTED;
         goto exit;
     }
 
+    // Serialize and send SUBSCRIBE message
     SuccessOrExit(error = subscribeMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
+
+    // Enqueue message to waiting queue - waiting for SUBACK
     SuccessOrExit(error = mSubscribeQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<SubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
             mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
@@ -753,21 +845,33 @@ otError MqttsnClient::Subscribe(TopicId aTopicId, Qos aQos, SubscribeCallbackFun
     SubscribeMessage subscribeMessage(false, aQos, mMessageId, kShortTopicName, aTopicId, "", "");
     unsigned char buffer[MAX_PACKET_SIZE];
 
+    // Client state must be active
     if (mClientState != kStateActive)
     {
         error = OT_ERROR_INVALID_STATE;
         goto exit;
     }
 
-    if (aQos != kQos0 && aQos != kQos1)
+    // Topic subscription is possible onlz for QoS levels 1, 2, 3
+    if (aQos != kQos0 || aQos != kQos1 || aQos != kQos2)
+    {
+        error = OT_ERROR_INVALID_ARGS;
+        goto exit;
+    }
+
+    // QoS 2 is not implemented
+    if (aQos == kQos2)
     {
         error = OT_ERROR_NOT_IMPLEMENTED;
         goto exit;
     }
 
+    // Serialize and send SUBSCRIBE message
     SuccessOrExit(error = subscribeMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
+
+    // Enqueue message to waiting queue - waiting for SUBACK
     SuccessOrExit(error = mSubscribeQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<SubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
             mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
@@ -785,14 +889,18 @@ otError MqttsnClient::Register(const char* aTopicName, RegisterCallbackFunc aCal
     RegisterMessage registerMessage(0, mMessageId, aTopicName);
     unsigned char buffer[MAX_PACKET_SIZE];
 
+    // Client state must be active
     if (mClientState != kStateActive)
     {
         error = OT_ERROR_INVALID_STATE;
         goto exit;
     }
+
+    // Serialize and send REGISTER message
     SuccessOrExit(error = registerMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
+    // Enqueue message to waiting queue - waiting for REGACK
     SuccessOrExit(error = mRegisterQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<RegisterCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
             mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
@@ -809,27 +917,32 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, c
     Message* message = nullptr;
     int32_t topicNameLength = strlen(aShortTopicName);
     PublishMessage publishMessage;
+    // Topic length must be 1 or 2
     VerifyOrExit(topicNameLength > 0 && topicNameLength <= 2, error = OT_ERROR_INVALID_ARGS);
     publishMessage = PublishMessage(false, false, aQos, mMessageId, kShortTopicName, 0, aShortTopicName, aData, aLenght);
     unsigned char buffer[MAX_PACKET_SIZE];
 
+    // Client state must be active
     if (mClientState != kStateActive)
     {
         error = OT_ERROR_INVALID_STATE;
         goto exit;
     }
 
+    // QoS levels 2 and -1 not implemented yet
     if (aQos != Qos::kQos0 && aQos != Qos::kQos1)
     {
         error = OT_ERROR_NOT_IMPLEMENTED;
         goto exit;
     }
 
+    // Serialize and send PUBLISH message
     SuccessOrExit(error = publishMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
     if (aQos == Qos::kQos1)
     {
+        // If QoS level 1 enqueue message to waiting queue - waiting for PUBACK
         SuccessOrExit(error = mPublishQos1Queue.EnqueueCopy(*message, message->GetLength(),
             MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
                 mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
@@ -848,23 +961,27 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, T
     PublishMessage publishMessage(false, false, aQos, mMessageId, kTopicId, aTopicId, "", aData, aLength);
     unsigned char buffer[MAX_PACKET_SIZE];
 
+    // Client state must be active
     if (mClientState != kStateActive)
     {
         error = OT_ERROR_INVALID_STATE;
         goto exit;
     }
 
+    // QoS levels 2 and -1 not implemented yet
     if (aQos != Qos::kQos0 && aQos != Qos::kQos1)
     {
         error = OT_ERROR_NOT_IMPLEMENTED;
         goto exit;
     }
 
+    // Serialize and send PUBLISH message
     SuccessOrExit(error = publishMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
     if (aQos == Qos::kQos1)
     {
+        // If QoS level 1 enqueue message to waiting queue - waiting for PUBACK
         SuccessOrExit(error = mPublishQos1Queue.EnqueueCopy(*message, message->GetLength(),
             MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
                 mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
@@ -882,19 +999,23 @@ otError MqttsnClient::Unsubscribe(const char* aShortTopicName, UnsubscribeCallba
     Message* message = nullptr;
     int32_t topicNameLength = strlen(aShortTopicName);
     UnsubscribeMessage unsubscribeMessage;
+    // Topic length must be 1 or 2
     VerifyOrExit(topicNameLength > 0 && topicNameLength <= 2, error = OT_ERROR_INVALID_ARGS);
     unsubscribeMessage = UnsubscribeMessage(mMessageId, kShortTopicName, 0, aShortTopicName);
     unsigned char buffer[MAX_PACKET_SIZE];
 
+    // Client state must be active
     if (mClientState != kStateActive)
     {
         error = OT_ERROR_INVALID_STATE;
         goto exit;
     }
 
+    // Serialize and send UNSUBSCRIBE message
     SuccessOrExit(error = unsubscribeMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
+    // Enqueue message to waiting queue - waiting for UNSUBACK
     SuccessOrExit(error = mUnsubscribeQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<UnsubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
             mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
@@ -912,15 +1033,18 @@ otError MqttsnClient::Unsubscribe(TopicId aTopicId, UnsubscribeCallbackFunc aCal
     UnsubscribeMessage unsubscribeMessage(mMessageId, kTopicId, aTopicId, "");
     unsigned char buffer[MAX_PACKET_SIZE];
 
+    // Client state must be active
     if (mClientState != kStateActive)
     {
         error = OT_ERROR_INVALID_STATE;
         goto exit;
     }
 
+    // Serialize and send UNSUBSCRIBE message
     SuccessOrExit(error = unsubscribeMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
+    // Enqueue message to waiting queue - waiting for UNSUBACK
     SuccessOrExit(error = mUnsubscribeQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<UnsubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
             mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
@@ -938,6 +1062,7 @@ otError MqttsnClient::Disconnect()
     DisconnectMessage disconnectMessage(0);
     unsigned char buffer[MAX_PACKET_SIZE];
 
+    // Client must be connected
     if (mClientState != kStateActive && mClientState != kStateAwake
         && mClientState != kStateAsleep)
     {
@@ -945,11 +1070,14 @@ otError MqttsnClient::Disconnect()
         goto exit;
     }
 
+    // Serialize and send DISCONNECT message
     SuccessOrExit(error = disconnectMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
 
+    // Set flag for regular disconnect request and wait for DISCONNECT message from gateway
     mDisconnectRequested = true;
+    // Set timeout time
     mGwTimeout = TimerMilli::GetNow() + mConfig.GetRetransmissionTimeout() * 1000;
 
 exit:
@@ -964,17 +1092,21 @@ otError MqttsnClient::Sleep(uint16_t aDuration)
     DisconnectMessage disconnectMessage(aDuration);
     unsigned char buffer[MAX_PACKET_SIZE];
 
+    // Client must be connected
     if (mClientState != kStateActive && mClientState != kStateAwake && mClientState != kStateAsleep)
     {
         error = OT_ERROR_INVALID_STATE;
         goto exit;
     }
 
+    // Serialize and send DISCONNECT message
     SuccessOrExit(error = disconnectMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
 
+    // Set flag for sleep request and wait for DISCONNECT message from gateway
     mSleepRequested = true;
+    // Set timeout time
     mGwTimeout = TimerMilli::GetNow() + mConfig.GetRetransmissionTimeout() * 1000;
 
 exit:
@@ -984,15 +1116,19 @@ exit:
 otError MqttsnClient::Awake(uint32_t aTimeout)
 {
     otError error = OT_ERROR_NONE;
+    // Awake is possible only when the client is in
     if (mClientState != kStateAwake && mClientState != kStateAsleep)
     {
         error = OT_ERROR_INVALID_STATE;
         goto exit;
     }
 
+    // Send PINGEQ message
     SuccessOrExit(error = PingGateway());
 
+    // Set awake state and wait for any PUBLISH messages
     mClientState = kStateAwake;
+    // Set timeout time - PINGRESP message must be delivered within this time
     mGwTimeout = TimerMilli::GetNow() + aTimeout;
 exit:
     return error;
@@ -1006,6 +1142,7 @@ otError MqttsnClient::SearchGateway(const Ip6::Address &aMulticastAddress, uint1
     SearchGwMessage searchGwMessage(aRadius);
     unsigned char buffer[MAX_PACKET_SIZE];
 
+    // Serialize and send SEARCHGW message
     SuccessOrExit(error = searchGwMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message, aMulticastAddress, aPort, aRadius));
@@ -1014,14 +1151,14 @@ exit:
     return error;
 }
 
-ClientState MqttsnClient::GetState(ClientState aState)
+ClientState MqttsnClient::GetState()
 {
     return mClientState;
 }
 
-otError MqttsnClient::SetConnectedCallback(ConnectCallbackFunc aCallback, void* aContext)
+otError MqttsnClient::SetConnectedCallback(ConnectedCallbackFunc aCallback, void* aContext)
 {
-    mConnectCallback = aCallback;
+    mConnectedCallback = aCallback;
     mConnectContext = aContext;
     return OT_ERROR_NONE;
 }
@@ -1128,6 +1265,7 @@ otError MqttsnClient::PingGateway()
         goto exit;
     }
 
+    // Serialize and send PINGREQ message
     SuccessOrExit(error = pingreqMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));

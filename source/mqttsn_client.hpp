@@ -558,7 +558,7 @@ public:
      * @param[in]  aContext  A pointer to connection callback context object.
      *
      */
-    typedef void (*ConnectCallbackFunc)(ReturnCode aCode, void* aContext);
+    typedef void (*ConnectedCallbackFunc)(ReturnCode aCode, void* aContext);
 
     /**
      * Declaration of function for subscribe callback.
@@ -843,7 +843,7 @@ public:
     /**
      * Awake the client and receive pending messages.
      *
-     * @param[in] aTimeout Timeout in milliseconds for staying in awake state. PINGRESP message must be received before timeout time passes.
+     * @param[in]  aTimeout  Timeout in milliseconds for staying in awake state. PINGRESP message must be received before timeout time passes.
      *
      * @retval OT_ERROR_NONE           Awake request successfully queued.
      * @retval OT_ERROR_INVALID_STATE  The client is not in relevant state. It must be asleep or awake.
@@ -852,38 +852,172 @@ public:
      */
     otError Awake(uint32_t aTimeout);
 
+    /**
+     * Search for gateway with multicast message.
+     *
+     * @param[in]  aMulticastAddress  A reference to multicast IPv6 address.
+     * @param[in]  aPort              Gateway port number.
+     * @param[in]  aRadius            Message hop limit (time to live)
+     *
+     * @retval OT_ERROR_NONE           Search gateway request successfully queued.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     *
+     */
     otError SearchGateway(const Ip6::Address &aMulticastAddress, uint16_t aPort, uint8_t aRadius);
 
-    ClientState GetState(ClientState aState);
+    /**
+     * Get current MQTT-SN client state.
+     *
+     * @returns Current client state.
+     *
+     */
+    ClientState GetState(void);
 
-    otError SetConnectedCallback(ConnectCallbackFunc aCallback, void* aContext);
+    /**
+     * Set callback function invoked when connection acknowledged or timed out.
+     *
+     * @param[in]  aCallback  A function pointer to connect callback function.
+     * @param[in]  aContext   A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE  Callback function successfully set.
+     *
+     */
+    otError SetConnectedCallback(ConnectedCallbackFunc aCallback, void* aContext);
 
+    /**
+     * Set callback function invoked when publish message received from the topic.
+     *
+     * @param[in]  aCallback  A function pointer to publish received callback function.
+     * @param[in]  aContext   A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE  Callback function successfully set.
+     *
+     */
     otError SetPublishReceivedCallback(PublishReceivedCallbackFunc aCallback, void* aContext);
 
+    /**
+     * Set callback function invoked when advertise message received from the gateway.
+     *
+     * @param[in]  aCallback  A function pointer to advertise callback function.
+     * @param[in]  aContext   A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE  Callback function successfully set.
+     *
+     */
     otError SetAdvertiseCallback(AdvertiseCallbackFunc aCallback, void* aContext);
 
+    /**
+     * Set callback function invoked when gateway info received from gateway.
+     *
+     * @param[in]  aCallback  A function pointer to gateway info received callback function.
+     * @param[in]  aContext   A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE  Callback function successfully set.
+     *
+     */
     otError SetSearchGwCallback(SearchGwCallbackFunc aCallback, void* aContext);
 
+    /**
+     * Set callback function invoked when disconnect acknowledged or timed out.
+     *
+     * @param[in]  aCallback  A function pointer to disconnect callback function.
+     * @param[in]  aContext   A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE  Callback function successfully set.
+     *
+     */
     otError SetDisconnectedCallback(DisconnectedCallbackFunc aCallback, void* aContext);
 
+    /**
+     * Set callback function invoked when register acknowledged.
+     *
+     * @param[in]  aCallback  A function pointer to register callback function.
+     * @param[in]  aContext   A pointer to context object passed to callback.
+     *
+     * @retval OT_ERROR_NONE  Callback function successfully set.
+     *
+     */
     otError SetRegisterReceivedCallback(RegisterReceivedCallbackFunc aCallback, void* aContext);
+
+protected:
+    /**
+     * Allocate new message with payload.
+     *
+     * @param[out]  aMessage  A pointer to message pointer.
+     * @param[in]   aBuffer   A pointer to payload byte array.
+     * @param[in]   aLength   Payload length in bytes.
+     *
+     * @retval OT_ERROR_NONE      New message successfully created.
+     * @retval OT_ERROR_NO_BUFS   Insufficient available buffers to allocate new message.
+     *
+     */
+    otError NewMessage(Message **aMessage, unsigned char* aBuffer, int32_t aLength);
+
+    /**
+     * Send OT message to configured gateway address.
+     *
+     * @param[in]  aMessage  A reference to message instance.
+     *
+     * @retval OT_ERROR_NONE      Message successfully enqueued.
+     * @retval OT_ERROR_NO_BUFS   Insufficient available buffers to enqueue message.
+     *
+     */
+    otError SendMessage(Message &aMessage);
+
+    /**
+     * Send OT message to specific gateway address.
+     *
+     * @param[in]  aMessage  A reference to message instance.
+     * @param[in]  aAddress  A reference to target gateway address.
+     * @param[in]  aPort     Target gateway port number.
+     *
+     * @retval OT_ERROR_NONE      Message successfully enqueued.
+     * @retval OT_ERROR_NO_BUFS   Insufficient available buffers to enqueue message.
+     *
+     */
+    otError SendMessage(Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort);
+
+    /**
+     * Send OT message to specific gateway address with limited hop limit.
+     *
+     * @param[in]  aMessage   A reference to message instance.
+     * @param[in]  aAddress   A reference to target gateway address.
+     * @param[in]  aPort      Target gateway port number.
+     * @param[in]  aHopLimit  Datagram hop limit.
+     *
+     * @retval OT_ERROR_NONE      Message successfully enqueued.
+     * @retval OT_ERROR_NO_BUFS   Insufficient available buffers to enqueue message.
+     *
+     */
+    otError SendMessage(Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, uint8_t aHopLimit);
+
+    /**
+     * Send PINGREQ message to gateway.
+     *
+     * @retval OT_ERROR_NONE      PINGREQ message successfully enqueued.
+     * @retval OT_ERROR_NO_BUFS   Insufficient available buffers to process.
+     *
+     */
+    otError PingGateway(void);
+
+    /**
+     * This method should be called after disconnected or lost to configure client internal state and forcing all messages to time out.
+     *
+     */
+    void OnDisconnected(void);
+
+    /**
+     * Compare IPv6 address with configured gateway address.
+     *
+     * @param[in]  aMessageInfo  A reference to message info.
+     *
+     * @returns  True if the address is equal to gateway address.
+     *
+     */
+    bool VerifyGatewayAddress(const Ip6::MessageInfo &aMessageInfo);
 
 private:
     static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
-
-    otError NewMessage(Message **aMessage, unsigned char* aBuffer, int32_t aLength);
-
-    otError SendMessage(Message &aMessage);
-
-    otError SendMessage(Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort);
-
-    otError SendMessage(Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, uint8_t aHopLimit);
-
-    otError PingGateway(void);
-
-    void OnDisconnected(void);
-
-    bool VerifyGatewayAddress(const Ip6::MessageInfo &aMessageInfo);
 
     static void HandleSubscribeTimeout(const MessageMetadata<SubscribeCallbackFunc> &aMetadata, void* aContext);
 
@@ -906,7 +1040,7 @@ private:
     WaitingMessagesQueue<RegisterCallbackFunc> mRegisterQueue;
     WaitingMessagesQueue<UnsubscribeCallbackFunc> mUnsubscribeQueue;
     WaitingMessagesQueue<PublishCallbackFunc> mPublishQos1Queue;
-    ConnectCallbackFunc mConnectCallback;
+    ConnectedCallbackFunc mConnectedCallback;
     void* mConnectContext;
     PublishReceivedCallbackFunc mPublishReceivedCallback;
     void* mPublishReceivedContext;

@@ -30,6 +30,12 @@
 #include "mqttsn_serializer.hpp"
 #include "MQTTSNPacket.h"
 
+/**
+ * @file
+ *   This file contains implementation of MQTT-SN protocol v1.2 messages serialization with Eclipse Paho serializer.
+ *
+ */
+
 namespace ot {
 
 namespace Mqttsn {

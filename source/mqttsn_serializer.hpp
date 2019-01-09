@@ -34,6 +34,12 @@
 #include "net/ip6_address.hpp"
 #include "mqttsn_client.hpp"
 
+/**
+ * @file
+ *   This file includes declaration of MQTT-SN protocol v1.2 messages serializers.
+ *
+ */
+
 namespace ot {
 
 namespace Mqttsn {
