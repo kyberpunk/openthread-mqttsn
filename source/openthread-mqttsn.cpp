@@ -151,13 +151,13 @@ static void MqttsnConnect(const ot::Ip6::Address &aAddress, uint16_t aPort)
     }
 }
 
-static void MqttsnPublished(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::TopicId aTopicId, void* aContext)
+static void MqttsnPublished(ot::Mqttsn::ReturnCode aCode, void* aContext)
 {
     OT_UNUSED_VARIABLE(aContext);
 
     if (aCode == ot::Mqttsn::kCodeAccepted)
     {
-        PRINTF("Successfully published to topic: %d.\r\n", aTopicId);
+        PRINTF("Successfully published %d.\r\n");
     }
     else
     {

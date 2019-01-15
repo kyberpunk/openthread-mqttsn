@@ -636,7 +636,7 @@ public:
      * @param[in]  aContext  A pointer to publish callback context object.
      *
      */
-    typedef void (*PublishCallbackFunc)(ReturnCode aCode, TopicId aTopicId, void* aContext);
+    typedef void (*PublishCallbackFunc)(ReturnCode aCode, void* aContext);
 
     /**
      * Declaration of function for unsubscribe callback.
@@ -1025,7 +1025,13 @@ private:
 
     static void HandleUnsubscribeTimeout(const MessageMetadata<UnsubscribeCallbackFunc> &aMetadata, void* aContext);
 
-    static void HandlePublishTimeout(const MessageMetadata<PublishCallbackFunc> &aMetadata, void* aContext);
+    static void HandlePublishQos1Timeout(const MessageMetadata<PublishCallbackFunc> &aMetadata, void* aContext);
+
+    static void HandlePublishQos2PublishTimeout(const MessageMetadata<PublishCallbackFunc> &aMetadata, void* aContext);
+
+    static void HandlePublishQos2PubrelTimeout(const MessageMetadata<PublishCallbackFunc> &aMetadata, void* aContext);
+
+    static void HandlePublishQos2PubrecTimeout(const MessageMetadata<void*> &aMetadata, void* aContext);
 
     Ip6::UdpSocket mSocket;
     MqttsnConfig mConfig;
@@ -1040,6 +1046,9 @@ private:
     WaitingMessagesQueue<RegisterCallbackFunc> mRegisterQueue;
     WaitingMessagesQueue<UnsubscribeCallbackFunc> mUnsubscribeQueue;
     WaitingMessagesQueue<PublishCallbackFunc> mPublishQos1Queue;
+    WaitingMessagesQueue<PublishCallbackFunc> mPublishQos2PublishQueue;
+    WaitingMessagesQueue<PublishCallbackFunc> mPublishQos2PubrelQueue;
+    WaitingMessagesQueue<void*> mPublishQos2PubrecQueue;
     ConnectedCallbackFunc mConnectedCallback;
     void* mConnectContext;
     PublishReceivedCallbackFunc mPublishReceivedCallback;

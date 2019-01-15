@@ -484,7 +484,7 @@ public:
         ;
     }
 
-    PubcompMessage (ReturnCode aReturnCode, uint16_t aMessageId)
+    PubcompMessage (uint16_t aMessageId)
         : MessageBase(kTypePubcomp)
         , mMessageId(aMessageId)
     {
@@ -512,7 +512,7 @@ public:
         ;
     }
 
-    PubrecMessage (ReturnCode aReturnCode, uint16_t aMessageId)
+    PubrecMessage (uint16_t aMessageId)
         : MessageBase(kTypePubrec)
         , mMessageId(aMessageId)
     {
@@ -540,7 +540,7 @@ public:
         ;
     }
 
-    PubrelMessage (ReturnCode aReturnCode, uint16_t aMessageId)
+    PubrelMessage (uint16_t aMessageId)
         : MessageBase(kTypePubrel)
         , mMessageId(aMessageId)
     {

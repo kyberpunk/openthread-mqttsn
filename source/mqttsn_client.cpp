@@ -51,7 +51,7 @@
 namespace ot {
 
 namespace Mqttsn {
-// TODO: Implement QoS and DUP behavior
+// TODO: Implement retransmission and DUP behavior
 // TODO: Implement OT logging
 
 template <typename CallbackType>
@@ -205,7 +205,10 @@ MqttsnClient::MqttsnClient(Instance& instance)
     , mSubscribeQueue(HandleSubscribeTimeout, this)
     , mRegisterQueue(HandleRegisterTimeout, this)
     , mUnsubscribeQueue(HandleUnsubscribeTimeout, this)
-    , mPublishQos1Queue(HandlePublishTimeout, this)
+    , mPublishQos1Queue(HandlePublishQos1Timeout, this)
+    , mPublishQos2PublishQueue(HandlePublishQos2PublishTimeout, this)
+    , mPublishQos2PubrelQueue(HandlePublishQos2PubrelTimeout, this)
+    , mPublishQos2PubrecQueue(HandlePublishQos2PubrecTimeout, this)
     , mConnectedCallback(nullptr)
     , mConnectContext(nullptr)
     , mPublishReceivedCallback(nullptr)
@@ -317,8 +320,8 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 
         // Find waiting message with corresponding ID
         MessageMetadata<SubscribeCallbackFunc> metadata;
-        Message* message = client->mSubscribeQueue.Find(subackMessage.GetMessageId(), metadata);
-        if (!message)
+        Message* subscribeMessage = client->mSubscribeQueue.Find(subackMessage.GetMessageId(), metadata);
+        if (!subscribeMessage)
         {
             break;
         }
@@ -328,7 +331,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             metadata.mCallback(subackMessage.GetReturnCode(), subackMessage.GetTopicId(),
                 subackMessage.GetQos(), metadata.mContext);
         }
-        client->mSubscribeQueue.Dequeue(*message);
+        client->mSubscribeQueue.Dequeue(*subscribeMessage);
     }
         break;
     // PUBLISH message
@@ -349,6 +352,18 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
+
+        // Filter duplicate QoS level 2 messages
+        if (publishMessage.GetQos() == kQos2)
+        {
+            MessageMetadata<void*> metadata;
+            Message* pubrecMessage = client->mPublishQos2PubrecQueue.Find(publishMessage.GetMessageId(), metadata);
+            if (pubrecMessage)
+            {
+                break;
+            }
+        }
+
         ReturnCode code = kCodeRejectedTopicId;
         if (client->mPublishReceivedCallback)
         {
@@ -359,32 +374,52 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
 
         // Handle QoS
-        if (publishMessage.GetQos() == kQos0)
+        if (publishMessage.GetQos() == kQos0 || publishMessage.GetQos() == kQosm1)
         {
-            // On QoS level 0 do nothing
+            // On QoS level 0 or -1 do nothing
             break;
         }
         else if (publishMessage.GetQos() == kQos1)
         {
             // On QoS level 1  send PUBACK response
             int32_t packetLength = -1;
-            Message* message = nullptr;
+            Message* responseMessage = nullptr;
             unsigned char buffer[MAX_PACKET_SIZE];
             PubackMessage pubackMessage(code, publishMessage.GetTopicId(), publishMessage.GetMessageId());
             if (pubackMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
             {
                 break;
             }
-            if (client->NewMessage(&message, buffer, packetLength) != OT_ERROR_NONE ||
-                client->SendMessage(*message) != OT_ERROR_NONE)
+            if (client->NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
+                client->SendMessage(*responseMessage) != OT_ERROR_NONE)
             {
                 break;
             }
         }
-        else
+        else if (publishMessage.GetQos() == kQos2)
         {
-            // QoS levels 2 and -1 are not supported yet
-            break;
+            // On QoS level 2 send PUBREC message and wait for PUBREL
+            int32_t packetLength = -1;
+            Message* responseMessage = nullptr;
+            unsigned char buffer[MAX_PACKET_SIZE];
+            PubrecMessage pubrecMessage(publishMessage.GetMessageId());
+            if (pubrecMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
+            {
+                break;
+            }
+            if (client->NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
+                client->SendMessage(*responseMessage) != OT_ERROR_NONE)
+            {
+                break;
+            }
+
+            // Add message to waiting queue, message with same messageId will not be processed until PUBREL message received
+            if (client->mPublishQos2PubrecQueue.EnqueueCopy(*responseMessage, responseMessage->GetLength(), MessageMetadata<void*>(
+                client->mConfig.GetAddress(), client->mConfig.GetPort(), publishMessage.GetMessageId(), TimerMilli::GetNow(),
+                client->mConfig.GetRetransmissionTimeout() * 1000, NULL, NULL)) != OT_ERROR_NONE)
+            {
+                break;
+            }
         }
     }
         break;
@@ -440,8 +475,8 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
         // Find waiting message with corresponding ID
         MessageMetadata<RegisterCallbackFunc> metadata;
-        Message* message = client->mRegisterQueue.Find(regackMessage.GetMessageId(), metadata);
-        if (!message)
+        Message* registerMessage = client->mRegisterQueue.Find(regackMessage.GetMessageId(), metadata);
+        if (!registerMessage)
         {
             break;
         }
@@ -450,14 +485,14 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             metadata.mCallback(regackMessage.GetReturnCode(), regackMessage.GetTopicId(), metadata.mContext);
         }
-        client->mRegisterQueue.Dequeue(*message);
+        client->mRegisterQueue.Dequeue(*registerMessage);
     }
         break;
     // REGISTER message
     case kTypeRegister:
     {
         int32_t packetLength = -1;
-        Message* message = nullptr;
+        Message* responseMessage = nullptr;
         unsigned char buffer[MAX_PACKET_SIZE];
 
         // Client state must be active
@@ -485,8 +520,12 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
 
         // Send REGACK response message
         RegackMessage regackMessage(code, registerMessage.GetTopicId(), registerMessage.GetMessageId());
-        if (client->NewMessage(&message, buffer, packetLength) != OT_ERROR_NONE ||
-            client->SendMessage(*message) != OT_ERROR_NONE)
+        if (regackMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
+        {
+            break;
+        }
+        if (client->NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
+            client->SendMessage(*responseMessage) != OT_ERROR_NONE)
         {
             break;
         }
@@ -510,23 +549,174 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
+
         // Process QoS level 1 message
         // Find message waiting for acknowledge
         MessageMetadata<PublishCallbackFunc> metadata;
-        Message* message = client->mPublishQos1Queue.Find(pubackMessage.GetMessageId(), metadata);
-        if (!message)
+        Message* publishMessage = client->mPublishQos1Queue.Find(pubackMessage.GetMessageId(), metadata);
+        if (publishMessage)
+        {
+            // Invoke confirmation callback
+            if (metadata.mCallback)
+            {
+                metadata.mCallback(pubackMessage.GetReturnCode(), metadata.mContext);
+            }
+            // Dequeue waiting message
+            client->mPublishQos1Queue.Dequeue(*publishMessage);
+            break;
+        }
+        // May be QoS level 2 message error response
+        publishMessage = client->mPublishQos2PublishQueue.Find(pubackMessage.GetMessageId(), metadata);
+        if (publishMessage)
+        {
+            // Invoke confirmation callback
+            if (metadata.mCallback)
+            {
+                metadata.mCallback(pubackMessage.GetReturnCode(), metadata.mContext);
+            }
+            // Dequeue waiting message
+            client->mPublishQos2PublishQueue.Dequeue(*publishMessage);
+            break;
+        }
+
+        // May be QoS level 0 message error response - it is not handled
+    }
+        break;
+    // PUBREC message
+    case kTypePubrec:
+    {
+        int32_t packetLength = -1;
+        unsigned char buffer[MAX_PACKET_SIZE];
+
+        // Client state must be active
+        if (client->mClientState != kStateActive)
+        {
+            break;
+        }
+        // Check source IPv6 address
+        if (!client->VerifyGatewayAddress(messageInfo))
+        {
+            break;
+        }
+
+        PubrecMessage pubrecMessage;
+        if (pubrecMessage.Deserialize(data, length) != OT_ERROR_NONE)
+        {
+            break;
+        }
+        // Process QoS level 2 message
+        // Find message waiting for receive acknowledge
+        MessageMetadata<PublishCallbackFunc> metadata;
+        Message* publishMessage = client->mPublishQos2PublishQueue.Find(pubrecMessage.GetMessageId(), metadata);
+        if (!publishMessage)
+        {
+            break;
+        }
+
+        // Send PUBREL message
+        PubrelMessage pubrelMessage(metadata.mMessageId);
+        if (pubrelMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
+        {
+            break;
+        }
+        Message* responseMessage = nullptr;
+        if (client->NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
+            client->SendMessage(*responseMessage) != OT_ERROR_NONE)
+        {
+            break;
+        }
+        // Enqueue PUBREL message and wait for PUBCOMP
+        if (client->mPublishQos2PubrelQueue.EnqueueCopy(*responseMessage, responseMessage->GetLength(),
+            MessageMetadata<PublishCallbackFunc>(client->mConfig.GetAddress(), client->mConfig.GetPort(), metadata.mMessageId,
+                TimerMilli::GetNow(), client->mConfig.GetRetransmissionTimeout() * 1000, metadata.mCallback, client)) != OT_ERROR_NONE)
+        {
+            break;
+        }
+
+        // Dequeue waiting PUBLISH message
+        client->mPublishQos2PublishQueue.Dequeue(*publishMessage);
+    }
+    // PUBREL message
+    case kTypePubrel:
+    {
+        int32_t packetLength = -1;
+        unsigned char buffer[MAX_PACKET_SIZE];
+
+        // Client state must be active
+        if (client->mClientState != kStateActive)
+        {
+            break;
+        }
+        // Check source IPv6 address
+        if (!client->VerifyGatewayAddress(messageInfo))
+        {
+            break;
+        }
+
+        PubrelMessage pubrelMessage;
+        if (pubrelMessage.Deserialize(data, length) != OT_ERROR_NONE)
+        {
+            break;
+        }
+        // Process QoS level 2 PUBREL message
+        // Find PUBREC message waiting for receive acknowledge
+        MessageMetadata<void*> metadata;
+        Message* pubrecMessage = client->mPublishQos2PubrecQueue.Find(pubrelMessage.GetMessageId(), metadata);
+        if (!pubrecMessage)
+        {
+            break;
+        }
+        // Send PUBCOMP message
+        PubcompMessage pubcompMessage(metadata.mMessageId);
+        if (pubcompMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
+        {
+            break;
+        }
+        Message* responseMessage = nullptr;
+        if (client->NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
+            client->SendMessage(*responseMessage) != OT_ERROR_NONE)
+        {
+            break;
+        }
+
+        // Dequeue waiting message
+        client->mPublishQos2PubrecQueue.Dequeue(*pubrecMessage);
+    }
+    // PUBCOMP message
+    case kTypePubcomp:
+    {
+        // Client state must be active
+        if (client->mClientState != kStateActive)
+        {
+            break;
+        }
+        // Check source IPv6 address
+        if (!client->VerifyGatewayAddress(messageInfo))
+        {
+            break;
+        }
+
+        PubcompMessage pubcompMessage;
+        if (pubcompMessage.Deserialize(data, length) != OT_ERROR_NONE)
+        {
+            break;
+        }
+        // Process QoS level 2 PUBCOMP message
+        // Find PUBREL message waiting for receive acknowledge
+        MessageMetadata<PublishCallbackFunc> metadata;
+        Message* pubrelMessage = client->mPublishQos2PubrelQueue.Find(pubcompMessage.GetMessageId(), metadata);
+        if (!pubrelMessage)
         {
             break;
         }
         // Invoke confirmation callback
         if (metadata.mCallback)
         {
-            metadata.mCallback(pubackMessage.GetReturnCode(), pubackMessage.GetTopicId(), metadata.mContext);
+            metadata.mCallback(kCodeAccepted, metadata.mContext);
         }
         // Dequeue waiting message
-        client->mPublishQos1Queue.Dequeue(*message);
+        client->mPublishQos2PubrelQueue.Dequeue(*pubrelMessage);
     }
-        break;
     // UNSUBACK message
     case kTypeUnsuback:
     {
@@ -548,8 +738,8 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         }
         // Find unsubscription message waiting for confirmation
         MessageMetadata<UnsubscribeCallbackFunc> metadata;
-        Message* message = client->mUnsubscribeQueue.Find(unsubackMessage.GetMessageId(), metadata);
-        if (!message)
+        Message* unsubscribeMessage = client->mUnsubscribeQueue.Find(unsubackMessage.GetMessageId(), metadata);
+        if (!unsubscribeMessage)
         {
             break;
         }
@@ -559,13 +749,13 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             metadata.mCallback(kCodeAccepted, metadata.mContext);
         }
         // Dequeue waiting message
-        client->mUnsubscribeQueue.Dequeue(*message);
+        client->mUnsubscribeQueue.Dequeue(*unsubscribeMessage);
     }
         break;
     // PINGREQ message
     case kTypePingreq:
     {
-        Message* message = nullptr;
+        Message* responseMessage = nullptr;
         int32_t packetLength = -1;
         unsigned char buffer[MAX_PACKET_SIZE];
 
@@ -587,8 +777,8 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
-        if (client->NewMessage(&message, buffer, packetLength) != OT_ERROR_NONE ||
-            client->SendMessage(*message, messageInfo.GetPeerAddr(), client->mConfig.GetPort()) != OT_ERROR_NONE)
+        if (client->NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
+            client->SendMessage(*responseMessage, messageInfo.GetPeerAddr(), client->mConfig.GetPort()) != OT_ERROR_NONE)
         {
             break;
         }
@@ -736,6 +926,8 @@ otError MqttsnClient::Process()
     SuccessOrExit(error = mRegisterQueue.HandleTimer());
     SuccessOrExit(error = mUnsubscribeQueue.HandleTimer());
     SuccessOrExit(error = mPublishQos1Queue.HandleTimer());
+    SuccessOrExit(error = mPublishQos2PublishQueue.HandleTimer());
+    SuccessOrExit(error = mPublishQos2PubrelQueue.HandleTimer());
 
 exit:
     // Handle timeout
@@ -807,17 +999,10 @@ otError MqttsnClient::Subscribe(const char* aTopicName, bool aIsShortTopicName, 
         goto exit;
     }
 
-    // Topic subscription is possible onlz for QoS levels 1, 2, 3
+    // Topic subscription is possible only for QoS levels 1, 2, 3
     if (aQos != kQos0 || aQos != kQos1 || aQos != kQos2)
     {
         error = OT_ERROR_INVALID_ARGS;
-        goto exit;
-    }
-
-    // QoS 2 is not implemented
-    if (aQos == kQos2)
-    {
-        error = OT_ERROR_NOT_IMPLEMENTED;
         goto exit;
     }
 
@@ -856,13 +1041,6 @@ otError MqttsnClient::Subscribe(TopicId aTopicId, Qos aQos, SubscribeCallbackFun
     if (aQos != kQos0 || aQos != kQos1 || aQos != kQos2)
     {
         error = OT_ERROR_INVALID_ARGS;
-        goto exit;
-    }
-
-    // QoS 2 is not implemented
-    if (aQos == kQos2)
-    {
-        error = OT_ERROR_NOT_IMPLEMENTED;
         goto exit;
     }
 
@@ -930,7 +1108,7 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, c
     }
 
     // QoS levels 2 and -1 not implemented yet
-    if (aQos != Qos::kQos0 && aQos != Qos::kQos1)
+    if (aQos != Qos::kQos0 && aQos != Qos::kQos1 && aQos != Qos::kQos2)
     {
         error = OT_ERROR_NOT_IMPLEMENTED;
         goto exit;
@@ -944,6 +1122,13 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, c
     {
         // If QoS level 1 enqueue message to waiting queue - waiting for PUBACK
         SuccessOrExit(error = mPublishQos1Queue.EnqueueCopy(*message, message->GetLength(),
+            MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
+                mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+    }
+    if (aQos == Qos::kQos2)
+    {
+        // If QoS level 1 enqueue message to waiting queue - waiting for PUBREC
+        SuccessOrExit(error = mPublishQos2PublishQueue.EnqueueCopy(*message, message->GetLength(),
             MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
                 mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
     }
@@ -969,7 +1154,7 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, T
     }
 
     // QoS levels 2 and -1 not implemented yet
-    if (aQos != Qos::kQos0 && aQos != Qos::kQos1)
+    if (aQos != Qos::kQos0 && aQos != Qos::kQos1 && aQos != Qos::kQos2)
     {
         error = OT_ERROR_NOT_IMPLEMENTED;
         goto exit;
@@ -983,6 +1168,13 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, T
     {
         // If QoS level 1 enqueue message to waiting queue - waiting for PUBACK
         SuccessOrExit(error = mPublishQos1Queue.EnqueueCopy(*message, message->GetLength(),
+            MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
+                mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+    }
+    if (aQos == Qos::kQos2)
+    {
+        // If QoS level 1 enqueue message to waiting queue - waiting for PUBREC
+        SuccessOrExit(error = mPublishQos2PublishQueue.EnqueueCopy(*message, message->GetLength(),
             MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
                 mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
     }
@@ -1286,6 +1478,8 @@ void MqttsnClient::OnDisconnected()
     mRegisterQueue.ForceTimeout();
     mUnsubscribeQueue.ForceTimeout();
     mPublishQos1Queue.ForceTimeout();
+    mPublishQos2PublishQueue.ForceTimeout();
+    mPublishQos2PubrelQueue.ForceTimeout();
 }
 
 bool MqttsnClient::VerifyGatewayAddress(const Ip6::MessageInfo &aMessageInfo)
@@ -1296,8 +1490,6 @@ bool MqttsnClient::VerifyGatewayAddress(const Ip6::MessageInfo &aMessageInfo)
 
 void MqttsnClient::HandleSubscribeTimeout(const MessageMetadata<SubscribeCallbackFunc> &aMetadata, void* aContext)
 {
-    OT_UNUSED_VARIABLE(aContext);
-
     MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
     client->mTimeoutRaised = true;
     aMetadata.mCallback(kCodeTimeout, 0, kQos0, aMetadata.mContext);
@@ -1305,8 +1497,6 @@ void MqttsnClient::HandleSubscribeTimeout(const MessageMetadata<SubscribeCallbac
 
 void MqttsnClient::HandleRegisterTimeout(const MessageMetadata<RegisterCallbackFunc> &aMetadata, void* aContext)
 {
-    OT_UNUSED_VARIABLE(aContext);
-
     MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
     client->mTimeoutRaised = true;
     aMetadata.mCallback(kCodeTimeout, 0, aMetadata.mContext);
@@ -1314,21 +1504,38 @@ void MqttsnClient::HandleRegisterTimeout(const MessageMetadata<RegisterCallbackF
 
 void MqttsnClient::HandleUnsubscribeTimeout(const MessageMetadata<UnsubscribeCallbackFunc> &aMetadata, void* aContext)
 {
-    OT_UNUSED_VARIABLE(aContext);
-
     MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
     client->mTimeoutRaised = true;
     aMetadata.mCallback(kCodeTimeout, aMetadata.mContext);
 }
 
-void MqttsnClient::HandlePublishTimeout(const MessageMetadata<PublishCallbackFunc> &aMetadata, void* aContext)
+void MqttsnClient::HandlePublishQos1Timeout(const MessageMetadata<PublishCallbackFunc> &aMetadata, void* aContext)
 {
-    OT_UNUSED_VARIABLE(aContext);
-
     MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
     client->mTimeoutRaised = true;
-    aMetadata.mCallback(kCodeTimeout, 0, aMetadata.mContext);
+    aMetadata.mCallback(kCodeTimeout, aMetadata.mContext);
+}
+
+void MqttsnClient::HandlePublishQos2PublishTimeout(const MessageMetadata<PublishCallbackFunc> &aMetadata, void* aContext)
+{
+    MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
+    client->mTimeoutRaised = true;
+    aMetadata.mCallback(kCodeTimeout, aMetadata.mContext);
+}
+
+void MqttsnClient::HandlePublishQos2PubrelTimeout(const MessageMetadata<PublishCallbackFunc> &aMetadata, void* aContext)
+{
+    MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
+    client->mTimeoutRaised = true;
+    aMetadata.mCallback(kCodeTimeout, aMetadata.mContext);
+}
+
+void MqttsnClient::HandlePublishQos2PubrecTimeout(const MessageMetadata<void*> &aMetadata, void* aContext)
+{
+    OT_UNUSED_VARIABLE(aMetadata);
+    OT_UNUSED_VARIABLE(aContext);
 }
 
 }
+
 }
