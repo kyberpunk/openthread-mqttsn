@@ -758,7 +758,7 @@ public:
      * Publish message to the topic with specific short topic name.
      *
      * @param[in]  aData            A pointer to byte array to be send as message payload.
-     * @param[in]  aLenght          Length of message payload data.
+     * @param[in]  aLength          Length of message payload data.
      * @param[in]  aQos             Message quality of service level.
      * @param[in]  aShortTopicName  A pointer to short topic name string of target topic.
      * @param[in]  aCallback        A function pointer to callback invoked when registration is acknowledged.
@@ -770,13 +770,13 @@ public:
      * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
      *
      */
-    otError Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, const char* aShortTopicName, PublishCallbackFunc aCallback, void* aContext);
+    otError Publish(const uint8_t* aData, int32_t aLength, Qos aQos, const char* aShortTopicName, PublishCallbackFunc aCallback, void* aContext);
 
     /**
      * Publish message to the topic with specific topic ID.
      *
      * @param[in]  aData      A pointer to byte array to be send as message payload.
-     * @param[in]  aLenght    Length of message payload data.
+     * @param[in]  aLength    Length of message payload data.
      * @param[in]  aQos       Message quality of service level.
      * @param[in]  aTopicId   Topic ID of target topic.
      * @param[in]  aCallback  A function pointer to callback invoked when registration is acknowledged.
@@ -787,7 +787,38 @@ public:
      * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
      *
      */
-    otError Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, TopicId aTopicId, PublishCallbackFunc aCallback, void* aContext);
+    otError Publish(const uint8_t* aData, int32_t aLength, Qos aQos, TopicId aTopicId, PublishCallbackFunc aCallback, void* aContext);
+
+    /**
+     * Publish message to the topic with specific short topic name with QoS level -1. No connection or subscription is required.
+     *
+     * @param[in]  aData            A pointer to byte array to be send as message payload.
+     * @param[in]  aLength          Length of message payload data.
+     * @param[in]  aShortTopicName  A pointer to short topic name string of target topic.
+     * @param[in]  aAddress         Gateway address.
+     * @param[in]  aPort            Gateway port.
+     *
+     * @retval OT_ERROR_NONE           Publish message successfully queued.
+     * @retval OT_ERROR_INVALID_ARGS   Invalid publish parameters. Short topic name must have one or two characters.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     *
+     */
+    otError PublishQosm1(const uint8_t* aData, int32_t aLength, const char* aShortTopicName, Ip6::Address aAddress, uint16_t aPort);
+
+    /**
+     * Publish message to the topic with specific topic ID with QoS level -1. No connection or subscription is required.
+     *
+     * @param[in]  aData      A pointer to byte array to be send as message payload.
+     * @param[in]  aLength    Length of message payload data.
+     * @param[in]  aTopicId   Topic ID of target topic.
+     * @param[in]  aAddress   Gateway address.
+     * @param[in]  aPort      Gateway port.
+     *
+     * @retval OT_ERROR_NONE           Publish message successfully queued.
+     * @retval OT_ERROR_NO_BUFS        Insufficient available buffers to process.
+     *
+     */
+    otError PublishQosm1(const uint8_t* aData, int32_t aLength, TopicId aTopicId, Ip6::Address aAddress, uint16_t aPort);
 
     /**
      * Unsubscribe from the topic with specific short topic name.

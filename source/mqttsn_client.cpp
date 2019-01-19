@@ -1037,7 +1037,7 @@ otError MqttsnClient::Subscribe(TopicId aTopicId, Qos aQos, SubscribeCallbackFun
         goto exit;
     }
 
-    // Topic subscription is possible onlz for QoS levels 1, 2, 3
+    // Topic subscription is possible only for QoS levels 1, 2, 3
     if (aQos != kQos0 || aQos != kQos1 || aQos != kQos2)
     {
         error = OT_ERROR_INVALID_ARGS;
@@ -1088,7 +1088,7 @@ exit:
     return error;
 }
 
-otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, const char* aShortTopicName, PublishCallbackFunc aCallback, void* aContext)
+otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, const char* aShortTopicName, PublishCallbackFunc aCallback, void* aContext)
 {
     otError error = OT_ERROR_NONE;
     int32_t length = -1;
@@ -1097,20 +1097,13 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLenght, Qos aQos, c
     PublishMessage publishMessage;
     // Topic length must be 1 or 2
     VerifyOrExit(topicNameLength > 0 && topicNameLength <= 2, error = OT_ERROR_INVALID_ARGS);
-    publishMessage = PublishMessage(false, false, aQos, mMessageId, kShortTopicName, 0, aShortTopicName, aData, aLenght);
+    publishMessage = PublishMessage(false, false, aQos, mMessageId, kShortTopicName, 0, aShortTopicName, aData, aLength);
     unsigned char buffer[MAX_PACKET_SIZE];
 
     // Client state must be active
     if (mClientState != kStateActive)
     {
         error = OT_ERROR_INVALID_STATE;
-        goto exit;
-    }
-
-    // QoS levels 2 and -1 not implemented yet
-    if (aQos != Qos::kQos0 && aQos != Qos::kQos1 && aQos != Qos::kQos2)
-    {
-        error = OT_ERROR_NOT_IMPLEMENTED;
         goto exit;
     }
 
@@ -1153,13 +1146,6 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, T
         goto exit;
     }
 
-    // QoS levels 2 and -1 not implemented yet
-    if (aQos != Qos::kQos0 && aQos != Qos::kQos1 && aQos != Qos::kQos2)
-    {
-        error = OT_ERROR_NOT_IMPLEMENTED;
-        goto exit;
-    }
-
     // Serialize and send PUBLISH message
     SuccessOrExit(error = publishMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
@@ -1178,6 +1164,45 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, T
             MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
                 mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
     }
+    mMessageId++;
+
+exit:
+    return error;
+}
+
+otError MqttsnClient::PublishQosm1(const uint8_t* aData, int32_t aLength, const char* aShortTopicName, Ip6::Address aAddress, uint16_t aPort)
+{
+    otError error = OT_ERROR_NONE;
+    int32_t length = -1;
+    Message* message = nullptr;
+    PublishMessage publishMessage;
+    int32_t topicNameLength = strlen(aShortTopicName);
+    VerifyOrExit(topicNameLength > 0 && topicNameLength <= 2, error = OT_ERROR_INVALID_ARGS);
+    publishMessage = PublishMessage(false, false, Qos::kQosm1, mMessageId, kShortTopicName, 0, aShortTopicName, aData, aLength);
+    unsigned char buffer[MAX_PACKET_SIZE];
+
+    // Serialize and send PUBLISH message
+    SuccessOrExit(error = publishMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
+    SuccessOrExit(error = NewMessage(&message, buffer, length));
+    SuccessOrExit(error = SendMessage(*message, aAddress, aPort));
+    mMessageId++;
+
+exit:
+    return error;
+}
+
+otError MqttsnClient::PublishQosm1(const uint8_t* aData, int32_t aLength, TopicId aTopicId, Ip6::Address aAddress, uint16_t aPort)
+{
+    otError error = OT_ERROR_NONE;
+    int32_t length = -1;
+    Message* message = nullptr;
+    PublishMessage publishMessage(false, false, Qos::kQosm1, mMessageId, kTopicId, aTopicId, "", aData, aLength);
+    unsigned char buffer[MAX_PACKET_SIZE];
+
+    // Serialize and send PUBLISH message
+    SuccessOrExit(error = publishMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
+    SuccessOrExit(error = NewMessage(&message, buffer, length));
+    SuccessOrExit(error = SendMessage(*message, aAddress, aPort));
     mMessageId++;
 
 exit:
