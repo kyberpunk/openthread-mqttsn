@@ -81,9 +81,22 @@ otError MessageMetadata<CallbackType>::AppendTo(Message &aMessage) const
 }
 
 template <typename CallbackType>
+otError MessageMetadata<CallbackType>::UpdateIn(Message &aMessage) const
+{
+    aMessage.Write(aMessage.GetLength() - sizeof(*this), sizeof(*this), this);
+    return OT_ERROR_NONE;
+}
+
+template <typename CallbackType>
 uint16_t MessageMetadata<CallbackType>::ReadFrom(Message &aMessage)
 {
     return aMessage.Read(aMessage.GetLength() - sizeof(*this), sizeof(*this), this);
+}
+
+template <typename CallbackType>
+Message* MessageMetadata<CallbackType>::GetRawMessage(const Message &aMessage) const
+{
+    return aMessage.Clone(aMessage.GetLength() - GetLength());
 }
 
 template <typename CallbackType>
@@ -93,10 +106,12 @@ uint16_t MessageMetadata<CallbackType>::GetLength() const
 }
 
 template <typename CallbackType>
-WaitingMessagesQueue<CallbackType>::WaitingMessagesQueue(TimeoutCallbackFunc aTimeoutCallback, void* aTimeoutContext)
+WaitingMessagesQueue<CallbackType>::WaitingMessagesQueue(TimeoutCallbackFunc aTimeoutCallback, void* aTimeoutContext, RetransmissionFunc aRetransmissionFunc, void* aRetransmissionContext)
     : mQueue()
     , mTimeoutCallback(aTimeoutCallback)
     , mTimeoutContext(aTimeoutContext)
+    , mRetransmissionFunc(aRetransmissionFunc)
+    , mRetransmissionContext(aRetransmissionContext)
 {
     ;
 }
@@ -150,6 +165,7 @@ otError WaitingMessagesQueue<CallbackType>::HandleTimer()
 {
     otError error = OT_ERROR_NONE;
     Message* message = mQueue.GetHead();
+    Message* retransmissionMessage = nullptr;
     while (message)
     {
         Message* current = message;
@@ -159,12 +175,29 @@ otError WaitingMessagesQueue<CallbackType>::HandleTimer()
         // check if message timed out
         if (metadata.mTimestamp + metadata.mRetransmissionTimeout <= TimerMilli::GetNow())
         {
-            if (mTimeoutCallback)
+            if (metadata.mRetransmissionCount > 0)
             {
-                // Invoke timeout callback
-                mTimeoutCallback(metadata, mTimeoutContext);
+                // Invoke message retransmission and decrement retransmission counter
+                if (mRetransmissionFunc)
+                {
+                    VerifyOrExit((retransmissionMessage = metadata.GetRawMessage(*current)), error = OT_ERROR_NO_BUFS);
+                    mRetransmissionFunc(*retransmissionMessage, metadata.mDestinationAddress, metadata.mDestinationPort, mRetransmissionContext);
+                    retransmissionMessage->Free();
+                }
+                metadata.mRetransmissionCount--;
+                metadata.mTimestamp = TimerMilli::GetNow();
+                // Update message metadata
+                metadata.UpdateIn(*current);
             }
-            SuccessOrExit(error = Dequeue(*current));
+            else
+            {
+                // Invoke timeout callback and dequeue message
+                if (mTimeoutCallback)
+                {
+                    mTimeoutCallback(metadata, mTimeoutContext);
+                }
+                SuccessOrExit(error = Dequeue(*current));
+            }
         }
     }
 exit:
@@ -202,13 +235,13 @@ MqttsnClient::MqttsnClient(Instance& instance)
     , mSleepRequested(false)
     , mTimeoutRaised(false)
     , mClientState(kStateDisconnected)
-    , mSubscribeQueue(HandleSubscribeTimeout, this)
-    , mRegisterQueue(HandleRegisterTimeout, this)
-    , mUnsubscribeQueue(HandleUnsubscribeTimeout, this)
-    , mPublishQos1Queue(HandlePublishQos1Timeout, this)
-    , mPublishQos2PublishQueue(HandlePublishQos2PublishTimeout, this)
-    , mPublishQos2PubrelQueue(HandlePublishQos2PubrelTimeout, this)
-    , mPublishQos2PubrecQueue(HandlePublishQos2PubrecTimeout, this)
+    , mSubscribeQueue(HandleSubscribeTimeout, this, HandleSubscribeRetransmission, this)
+    , mRegisterQueue(HandleRegisterTimeout, this, HandleMessageRetransmission, this)
+    , mUnsubscribeQueue(HandleUnsubscribeTimeout, this, HandleMessageRetransmission, this)
+    , mPublishQos1Queue(HandlePublishQos1Timeout, this, HandlePublishRetransmission, this)
+    , mPublishQos2PublishQueue(HandlePublishQos2PublishTimeout, this, HandlePublishRetransmission, this)
+    , mPublishQos2PubrelQueue(HandlePublishQos2PubrelTimeout, this, HandleMessageRetransmission, this)
+    , mPublishQos2PubrecQueue(HandlePublishQos2PubrecTimeout, this, HandleMessageRetransmission, this)
     , mConnectedCallback(nullptr)
     , mConnectContext(nullptr)
     , mPublishReceivedCallback(nullptr)
@@ -1559,6 +1592,86 @@ void MqttsnClient::HandlePublishQos2PubrecTimeout(const MessageMetadata<void*> &
 {
     OT_UNUSED_VARIABLE(aMetadata);
     OT_UNUSED_VARIABLE(aContext);
+}
+
+void MqttsnClient::HandleMessageRetransmission(const Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, void* aContext)
+{
+    MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
+    Message* retransmissionMessage = aMessage.Clone(aMessage.GetLength());
+    if (retransmissionMessage != NULL)
+    {
+        client->SendMessage(*retransmissionMessage, aAddress, aPort);
+    }
+}
+
+void MqttsnClient::HandlePublishRetransmission(const Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, void* aContext)
+{
+    MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
+    unsigned char buffer[MAX_PACKET_SIZE];
+    PublishMessage publishMessage;
+
+    // Read message content
+    uint16_t offset = aMessage.GetOffset();
+    int32_t length = aMessage.GetLength() - aMessage.GetOffset();
+
+    unsigned char data[MAX_PACKET_SIZE];
+
+    if (length > MAX_PACKET_SIZE || !data)
+    {
+        return;
+    }
+    aMessage.Read(offset, length, data);
+    if (publishMessage.Deserialize(buffer, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    // Set DUP flag
+    publishMessage.SetDupFlag(true);
+    if (publishMessage.Serialize(buffer, MAX_PACKET_SIZE, &length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    Message* retransmissionMessage = NULL;
+    if (client->NewMessage(&retransmissionMessage, buffer, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    client->SendMessage(*retransmissionMessage, aAddress, aPort);
+}
+
+void MqttsnClient::HandleSubscribeRetransmission(const Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, void* aContext)
+{
+    MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
+    unsigned char buffer[MAX_PACKET_SIZE];
+    SubscribeMessage subscribeMessage;
+
+    // Read message content
+    uint16_t offset = aMessage.GetOffset();
+    int32_t length = aMessage.GetLength() - aMessage.GetOffset();
+
+    unsigned char data[MAX_PACKET_SIZE];
+
+    if (length > MAX_PACKET_SIZE || !data)
+    {
+        return;
+    }
+    aMessage.Read(offset, length, data);
+    if (subscribeMessage.Deserialize(buffer, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    // Set DUP flag
+    subscribeMessage.SetDupFlag(true);
+    if (subscribeMessage.Serialize(buffer, MAX_PACKET_SIZE, &length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    Message* retransmissionMessage = NULL;
+    if (client->NewMessage(&retransmissionMessage, buffer, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    client->SendMessage(*retransmissionMessage, aAddress, aPort);
 }
 
 }

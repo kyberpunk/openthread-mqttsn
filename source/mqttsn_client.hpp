@@ -235,6 +235,8 @@ public:
      */
     otError AppendTo(Message &aMessage) const;
 
+    otError UpdateIn(Message &aMessage) const;
+
     /**
      * Read metadata from the message.
      *
@@ -244,6 +246,8 @@ public:
      *
      */
     uint16_t ReadFrom(Message &aMessage);
+
+    Message* GetRawMessage(const Message &aMessage) const;
 
     /**
      * Get metadata length in bytes.
@@ -297,7 +301,7 @@ private:
 };
 
 /**
- * The class represents the queue which contains messages waiting for acknowledgements from gateway.
+ * The class represents the queue which contains messages waiting for acknowledgments from gateway.
  *
  */
 template <typename CallbackType>
@@ -307,17 +311,32 @@ public:
     /**
      * Declaration of a function pointer which is used as timeout callback.
      *
+     * @param[in]  aMetadata  A reference to message metadata.
+     * @param[in]  aContext   A poter to timeout callback context object.
+     *
      */
     typedef void (*TimeoutCallbackFunc)(const MessageMetadata<CallbackType> &aMetadata, void* aContext);
 
     /**
+     * Declaration of a function pointer for handling message retransmission.
+     *
+     * @param[in]  aMessage  A reference to message to be resend.
+     * @param[in]  aAddress  A reference to destination gateway address.
+     * @param[in]  aPort     Destination port.
+     * @param[in]  aContext  A pointer to retransmission callback context object.
+     */
+    typedef void (*RetransmissionFunc)(const Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, void* aContext);
+
+    /**
      * This constructor initializes the object with specific values.
      *
-     * @param[in]  aTimeoutCallback  A function pointer to callback which is invoked on message timeout.
-     * @param[in]  aTimeoutContext   A pointer to context passed to timeout callback.
+     * @param[in]  aTimeoutCallback        A function pointer to callback which is invoked on message timeout.
+     * @param[in]  aTimeoutContext         A pointer to context passed to timeout callback.
+     * @param[in]  aRetransmissionFunc     A function pointer to retransmission function.
+     * @param[in]  aRetransmissionContext  A pointer to context passed to retransmission function.
      *
      */
-    WaitingMessagesQueue(TimeoutCallbackFunc aTimeoutCallback, void* aTimeoutContext);
+    WaitingMessagesQueue(TimeoutCallbackFunc aTimeoutCallback, void* aTimeoutContext, RetransmissionFunc aRetransmissionFunc, void* aRetransmissionContext);
 
     /**
      * Default object destructor.
@@ -378,6 +397,8 @@ private:
     MessageQueue mQueue;
     TimeoutCallbackFunc mTimeoutCallback;
     void* mTimeoutContext;
+    RetransmissionFunc mRetransmissionFunc;
+    void* mRetransmissionContext;
 };
 
 /**
@@ -1063,6 +1084,12 @@ private:
     static void HandlePublishQos2PubrelTimeout(const MessageMetadata<PublishCallbackFunc> &aMetadata, void* aContext);
 
     static void HandlePublishQos2PubrecTimeout(const MessageMetadata<void*> &aMetadata, void* aContext);
+
+    static void HandleMessageRetransmission(const Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, void* aContext);
+
+    static void HandlePublishRetransmission(const Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, void* aContext);
+
+    static void HandleSubscribeRetransmission(const Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, void* aContext);
 
     Ip6::UdpSocket mSocket;
     MqttsnConfig mConfig;
