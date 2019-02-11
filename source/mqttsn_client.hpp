@@ -222,7 +222,7 @@ public:
      * @param[in]  aContext                Pointer to callback passed to timeout callback.
      *
      */
-    MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aMessageId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, CallbackType aCallback, void* aContext);
+    MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aMessageId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, uint8_t aRetransmissionCount, CallbackType aCallback, void* aContext);
 
     /**
      * Append metadata to the message.
@@ -235,6 +235,14 @@ public:
      */
     otError AppendTo(Message &aMessage) const;
 
+    /**
+     * Update metadata of the message.
+     *
+     * @param[in]  aMessage  A reference to the message.
+     *
+     * @retval OT_ERROR_NONE     Successfully updated the message.
+     *
+     */
     otError UpdateIn(Message &aMessage) const;
 
     /**
@@ -247,6 +255,14 @@ public:
      */
     uint16_t ReadFrom(Message &aMessage);
 
+    /**
+     * Get message without metadata bytes.
+     *
+     * @param[in]  aMessage  A reference to the message.
+     *
+     * @returns  Returns a pointer to the message or null if invalid input message.
+     *
+     */
     Message* GetRawMessage(const Message &aMessage) const;
 
     /**
@@ -393,6 +409,13 @@ public:
      */
     void ForceTimeout(void);
 
+    /**
+     * Determine if is the queue empty.
+     *
+     * @returns  Returns true if the queue is empty or false otherwise.
+     */
+    bool IsEmpty(void);
+
 private:
     MessageQueue mQueue;
     TimeoutCallbackFunc mTimeoutCallback;
@@ -420,6 +443,7 @@ public:
         , mKeepAlive(30)
         , mCleanSession()
         , mRetransmissionTimeout(10)
+        , mRetransmissionCount(3)
     {
         ;
     }
@@ -556,6 +580,28 @@ public:
         mRetransmissionTimeout = aTimeout;
     }
 
+    /**
+     * Get retransmission count.
+     *
+     * @returns Retransmission count.
+     *
+     */
+    uint8_t GetRetransmissionCount()
+    {
+        return mRetransmissionCount;
+    }
+
+    /**
+     * Set retransmission count.
+     *
+     * @param[in]  aTimeout  Retransmission count.
+     *
+     */
+    void SetRetransmissionCount(uint8_t aCount)
+    {
+        mRetransmissionCount = aCount;
+    }
+
 private:
     Ip6::Address mAddress;
     uint16_t mPort;
@@ -563,6 +609,7 @@ private:
     uint16_t mKeepAlive;
     bool mCleanSession;
     uint32_t mRetransmissionTimeout;
+    uint8_t mRetransmissionCount;
 };
 
 /**
@@ -1085,6 +1132,12 @@ private:
 
     static void HandlePublishQos2PubrecTimeout(const MessageMetadata<void*> &aMetadata, void* aContext);
 
+    static void HandleConnectTimeout(const MessageMetadata<void*> &aMetadata, void* aContext);
+
+    static void HandleDisconnectTimeout(const MessageMetadata<void*> &aMetadata, void* aContext);
+
+    static void HandlePingreqTimeout(const MessageMetadata<void*> &aMetadata, void* aContext);
+
     static void HandleMessageRetransmission(const Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, void* aContext);
 
     static void HandlePublishRetransmission(const Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, void* aContext);
@@ -1095,7 +1148,6 @@ private:
     MqttsnConfig mConfig;
     uint16_t mMessageId;
     uint32_t mPingReqTime;
-    uint32_t mGwTimeout;
     bool mDisconnectRequested;
     bool mSleepRequested;
     bool mTimeoutRaised;
@@ -1107,6 +1159,9 @@ private:
     WaitingMessagesQueue<PublishCallbackFunc> mPublishQos2PublishQueue;
     WaitingMessagesQueue<PublishCallbackFunc> mPublishQos2PubrelQueue;
     WaitingMessagesQueue<void*> mPublishQos2PubrecQueue;
+    WaitingMessagesQueue<void*> mConnectQueue;
+    WaitingMessagesQueue<void*> mDisconnectQueue;
+    WaitingMessagesQueue<void*> mPingreqQueue;
     ConnectedCallbackFunc mConnectedCallback;
     void* mConnectContext;
     PublishReceivedCallbackFunc mPublishReceivedCallback;

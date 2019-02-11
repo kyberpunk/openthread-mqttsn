@@ -61,7 +61,7 @@ MessageMetadata<CallbackType>::MessageMetadata()
 }
 
 template <typename CallbackType>
-MessageMetadata<CallbackType>::MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aMessageId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, CallbackType aCallback, void* aContext)
+MessageMetadata<CallbackType>::MessageMetadata(const Ip6::Address &aDestinationAddress, uint16_t aDestinationPort, uint16_t aMessageId, uint32_t aTimestamp, uint32_t aRetransmissionTimeout, uint8_t aRetransmissionCount, CallbackType aCallback, void* aContext)
     : mDestinationAddress(aDestinationAddress)
     , mDestinationPort(aDestinationPort)
     , mMessageId(aMessageId)
@@ -222,7 +222,11 @@ void WaitingMessagesQueue<CallbackType>::ForceTimeout()
     }
 }
 
-
+template <typename CallbackType>
+bool WaitingMessagesQueue<CallbackType>::IsEmpty()
+{
+    return mQueue.GetHead() == nullptr;
+}
 
 MqttsnClient::MqttsnClient(Instance& instance)
     : InstanceLocator(instance)
@@ -230,7 +234,6 @@ MqttsnClient::MqttsnClient(Instance& instance)
     , mConfig()
     , mMessageId(1)
     , mPingReqTime(0)
-    , mGwTimeout(0)
     , mDisconnectRequested(false)
     , mSleepRequested(false)
     , mTimeoutRaised(false)
@@ -242,6 +245,9 @@ MqttsnClient::MqttsnClient(Instance& instance)
     , mPublishQos2PublishQueue(HandlePublishQos2PublishTimeout, this, HandlePublishRetransmission, this)
     , mPublishQos2PubrelQueue(HandlePublishQos2PubrelTimeout, this, HandleMessageRetransmission, this)
     , mPublishQos2PubrecQueue(HandlePublishQos2PubrecTimeout, this, HandleMessageRetransmission, this)
+    , mConnectQueue(HandleConnectTimeout, this, HandleMessageRetransmission, this)
+    , mDisconnectQueue(HandleDisconnectTimeout, this, HandleMessageRetransmission, this)
+    , mPingreqQueue(HandlePingreqTimeout, this, HandleMessageRetransmission, this)
     , mConnectedCallback(nullptr)
     , mConnectContext(nullptr)
     , mPublishReceivedCallback(nullptr)
@@ -319,13 +325,23 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
+
         ConnackMessage connackMessage;
         if (connackMessage.Deserialize(data, length) != OT_ERROR_NONE)
         {
             break;
         }
+        MessageMetadata<void*> metadata;
+
+        // Check if any waiting connect message queued
+        Message *connectMessage = client->mConnectQueue.Find(0, metadata);
+        if (connectMessage == nullptr)
+        {
+            break;
+        }
+        client->mConnectQueue.Dequeue(*connectMessage);
+
         client->mClientState = kStateActive;
-        client->mGwTimeout = 0;
         if (client->mConnectedCallback)
         {
             client->mConnectedCallback(connackMessage.GetReturnCode(), client->mConnectContext);
@@ -449,7 +465,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             // Add message to waiting queue, message with same messageId will not be processed until PUBREL message received
             if (client->mPublishQos2PubrecQueue.EnqueueCopy(*responseMessage, responseMessage->GetLength(), MessageMetadata<void*>(
                 client->mConfig.GetAddress(), client->mConfig.GetPort(), publishMessage.GetMessageId(), TimerMilli::GetNow(),
-                client->mConfig.GetRetransmissionTimeout() * 1000, NULL, NULL)) != OT_ERROR_NONE)
+                client->mConfig.GetRetransmissionTimeout() * 1000, client->mConfig.GetRetransmissionCount(), NULL, NULL)) != OT_ERROR_NONE)
             {
                 break;
             }
@@ -661,7 +677,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         // Enqueue PUBREL message and wait for PUBCOMP
         if (client->mPublishQos2PubrelQueue.EnqueueCopy(*responseMessage, responseMessage->GetLength(),
             MessageMetadata<PublishCallbackFunc>(client->mConfig.GetAddress(), client->mConfig.GetPort(), metadata.mMessageId,
-                TimerMilli::GetNow(), client->mConfig.GetRetransmissionTimeout() * 1000, metadata.mCallback, client)) != OT_ERROR_NONE)
+                TimerMilli::GetNow(), client->mConfig.GetRetransmissionTimeout() * 1000, client->mConfig.GetRetransmissionCount(), metadata.mCallback, client)) != OT_ERROR_NONE)
         {
             break;
         }
@@ -831,8 +847,15 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             break;
         }
 
-        // Reset client timeout counter
-        client->mGwTimeout = 0;
+        // Check if any waiting connect message queued
+        MessageMetadata<void*> metadata;
+        Message *pingreqMessage = client->mPingreqQueue.Find(0, metadata);
+        if (pingreqMessage == nullptr)
+        {
+            break;
+        }
+        client->mPingreqQueue.Dequeue(*pingreqMessage);
+
         // If the client is awake PINRESP message put it into sleep again
         if (client->mClientState == kStateAwake)
         {
@@ -853,6 +876,21 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
         {
             break;
         }
+
+        // Check source IPv6 address
+        if (!client->VerifyGatewayAddress(messageInfo))
+        {
+            break;
+        }
+
+        // Check if the waiting disconnect message is queued
+        MessageMetadata<void*> metadata;
+        Message *waitingMessage = client->mDisconnectQueue.Find(0, metadata);
+        if (waitingMessage == nullptr)
+        {
+            break;
+        }
+        client->mDisconnectQueue.Dequeue(*waitingMessage);
 
         DisconnectType reason = kServer;
 
@@ -882,11 +920,6 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
             }
             break;
         default:
-            break;
-        }
-        // Check source IPv6 address
-        if (!client->VerifyGatewayAddress(messageInfo))
-        {
             break;
         }
         client->OnDisconnected();
@@ -944,14 +977,6 @@ otError MqttsnClient::Process()
     if (mClientState == kStateActive && mPingReqTime != 0 && mPingReqTime <= now)
     {
         SuccessOrExit(error = PingGateway());
-        mGwTimeout = TimerMilli::GetNow() + mConfig.GetRetransmissionTimeout() * 1000;
-    }
-
-    // Set timeout flag when communication timed out
-    if (mGwTimeout != 0 && mGwTimeout <= now)
-    {
-        mTimeoutRaised = true;
-        goto exit;
     }
 
     // Handle pending messages timeouts
@@ -964,7 +989,7 @@ otError MqttsnClient::Process()
 
 exit:
     // Handle timeout
-    if (mTimeoutRaised)
+    if (mTimeoutRaised && mClientState == kStateActive)
     {
         mClientState = kStateLost;
         OnDisconnected();
@@ -986,7 +1011,7 @@ otError MqttsnClient::Connect(MqttsnConfig &aConfig)
     unsigned char buffer[MAX_PACKET_SIZE];
 
     // Cannot connect in active state (already connected)
-    if (mClientState == kStateActive)
+    if (mClientState == kStateActive || !mConnectQueue.IsEmpty())
     {
         error = OT_ERROR_INVALID_STATE;
         goto exit;
@@ -998,10 +1023,13 @@ otError MqttsnClient::Connect(MqttsnConfig &aConfig)
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
 
+    SuccessOrExit(error = mConnectQueue.EnqueueCopy(*message, message->GetLength(),
+            MessageMetadata<void*>(mConfig.GetAddress(), mConfig.GetPort(), 0, TimerMilli::GetNow(),
+                mConfig.GetRetransmissionTimeout() * 1000, mConfig.GetRetransmissionCount(), nullptr, nullptr)));
+
     mDisconnectRequested = false;
     mSleepRequested = false;
-    // Set timeout time
-    mGwTimeout = TimerMilli::GetNow() + mConfig.GetRetransmissionTimeout() * 1000;
+
     // Set next keepalive PINGREQ time
     mPingReqTime = TimerMilli::GetNow() + mConfig.GetKeepAlive() * 700;
 
@@ -1047,7 +1075,7 @@ otError MqttsnClient::Subscribe(const char* aTopicName, bool aIsShortTopicName, 
     // Enqueue message to waiting queue - waiting for SUBACK
     SuccessOrExit(error = mSubscribeQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<SubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
-            mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+            mConfig.GetRetransmissionTimeout() * 1000, mConfig.GetRetransmissionCount(), aCallback, aContext)));
     mMessageId++;
 
 exit:
@@ -1085,7 +1113,7 @@ otError MqttsnClient::Subscribe(TopicId aTopicId, Qos aQos, SubscribeCallbackFun
     // Enqueue message to waiting queue - waiting for SUBACK
     SuccessOrExit(error = mSubscribeQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<SubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
-            mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+            mConfig.GetRetransmissionTimeout() * 1000, mConfig.GetRetransmissionCount(), aCallback, aContext)));
     mMessageId++;
 
 exit:
@@ -1114,7 +1142,7 @@ otError MqttsnClient::Register(const char* aTopicName, RegisterCallbackFunc aCal
     // Enqueue message to waiting queue - waiting for REGACK
     SuccessOrExit(error = mRegisterQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<RegisterCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
-            mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+            mConfig.GetRetransmissionTimeout() * 1000, mConfig.GetRetransmissionCount(), aCallback, aContext)));
     mMessageId++;
 
 exit:
@@ -1149,14 +1177,14 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, c
         // If QoS level 1 enqueue message to waiting queue - waiting for PUBACK
         SuccessOrExit(error = mPublishQos1Queue.EnqueueCopy(*message, message->GetLength(),
             MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
-                mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+                mConfig.GetRetransmissionTimeout() * 1000, mConfig.GetRetransmissionCount(), aCallback, aContext)));
     }
     if (aQos == Qos::kQos2)
     {
         // If QoS level 1 enqueue message to waiting queue - waiting for PUBREC
         SuccessOrExit(error = mPublishQos2PublishQueue.EnqueueCopy(*message, message->GetLength(),
             MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
-                mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+                mConfig.GetRetransmissionTimeout() * 1000, mConfig.GetRetransmissionCount(), aCallback, aContext)));
     }
     mMessageId++;
 
@@ -1188,14 +1216,14 @@ otError MqttsnClient::Publish(const uint8_t* aData, int32_t aLength, Qos aQos, T
         // If QoS level 1 enqueue message to waiting queue - waiting for PUBACK
         SuccessOrExit(error = mPublishQos1Queue.EnqueueCopy(*message, message->GetLength(),
             MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
-                mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+                mConfig.GetRetransmissionTimeout() * 1000, mConfig.GetRetransmissionCount(), aCallback, aContext)));
     }
     if (aQos == Qos::kQos2)
     {
         // If QoS level 1 enqueue message to waiting queue - waiting for PUBREC
         SuccessOrExit(error = mPublishQos2PublishQueue.EnqueueCopy(*message, message->GetLength(),
             MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
-                mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+                mConfig.GetRetransmissionTimeout() * 1000, mConfig.GetRetransmissionCount(), aCallback, aContext)));
     }
     mMessageId++;
 
@@ -1268,7 +1296,7 @@ otError MqttsnClient::Unsubscribe(const char* aShortTopicName, UnsubscribeCallba
     // Enqueue message to waiting queue - waiting for UNSUBACK
     SuccessOrExit(error = mUnsubscribeQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<UnsubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
-            mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+            mConfig.GetRetransmissionTimeout() * 1000, mConfig.GetRetransmissionCount(), aCallback, aContext)));
     mMessageId++;
 
 exit:
@@ -1297,7 +1325,7 @@ otError MqttsnClient::Unsubscribe(TopicId aTopicId, UnsubscribeCallbackFunc aCal
     // Enqueue message to waiting queue - waiting for UNSUBACK
     SuccessOrExit(error = mUnsubscribeQueue.EnqueueCopy(*message, message->GetLength(),
         MessageMetadata<UnsubscribeCallbackFunc>(mConfig.GetAddress(), mConfig.GetPort(), mMessageId, TimerMilli::GetNow(),
-            mConfig.GetRetransmissionTimeout() * 1000, aCallback, aContext)));
+            mConfig.GetRetransmissionTimeout() * 1000, mConfig.GetRetransmissionCount(), aCallback, aContext)));
     mMessageId++;
 
 exit:
@@ -1313,8 +1341,8 @@ otError MqttsnClient::Disconnect()
     unsigned char buffer[MAX_PACKET_SIZE];
 
     // Client must be connected
-    if (mClientState != kStateActive && mClientState != kStateAwake
-        && mClientState != kStateAsleep)
+    if ((mClientState != kStateActive && mClientState != kStateAwake
+        && mClientState != kStateAsleep) || !mDisconnectQueue.IsEmpty())
     {
         error = OT_ERROR_INVALID_STATE;
         goto exit;
@@ -1325,10 +1353,12 @@ otError MqttsnClient::Disconnect()
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
 
+    SuccessOrExit(error = mDisconnectQueue.EnqueueCopy(*message, message->GetLength(),
+        MessageMetadata<void*>(mConfig.GetAddress(), mConfig.GetPort(), 0, TimerMilli::GetNow(),
+            mConfig.GetRetransmissionTimeout() * 1000, 0, nullptr, nullptr)));
+
     // Set flag for regular disconnect request and wait for DISCONNECT message from gateway
     mDisconnectRequested = true;
-    // Set timeout time
-    mGwTimeout = TimerMilli::GetNow() + mConfig.GetRetransmissionTimeout() * 1000;
 
 exit:
     return error;
@@ -1343,7 +1373,8 @@ otError MqttsnClient::Sleep(uint16_t aDuration)
     unsigned char buffer[MAX_PACKET_SIZE];
 
     // Client must be connected
-    if (mClientState != kStateActive && mClientState != kStateAwake && mClientState != kStateAsleep)
+    if ((mClientState != kStateActive && mClientState != kStateAwake && mClientState != kStateAsleep)
+        || !mDisconnectQueue.IsEmpty())
     {
         error = OT_ERROR_INVALID_STATE;
         goto exit;
@@ -1354,10 +1385,12 @@ otError MqttsnClient::Sleep(uint16_t aDuration)
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
 
+    SuccessOrExit(error = mDisconnectQueue.EnqueueCopy(*message, message->GetLength(),
+        MessageMetadata<void*>(mConfig.GetAddress(), mConfig.GetPort(), 0, TimerMilli::GetNow(),
+            mConfig.GetRetransmissionTimeout() * 1000, 0, nullptr, nullptr)));
+
     // Set flag for sleep request and wait for DISCONNECT message from gateway
     mSleepRequested = true;
-    // Set timeout time
-    mGwTimeout = TimerMilli::GetNow() + mConfig.GetRetransmissionTimeout() * 1000;
 
 exit:
     return error;
@@ -1378,8 +1411,6 @@ otError MqttsnClient::Awake(uint32_t aTimeout)
 
     // Set awake state and wait for any PUBLISH messages
     mClientState = kStateAwake;
-    // Set timeout time - PINGRESP message must be delivered within this time
-    mGwTimeout = TimerMilli::GetNow() + aTimeout;
 exit:
     return error;
 }
@@ -1488,11 +1519,6 @@ otError MqttsnClient::SendMessage(Message &aMessage, const Ip6::Address &aAddres
     PRINTF("Sending message to %s[:%u]\r\n", messageInfo.GetPeerAddr().ToString().AsCString(), messageInfo.GetPeerPort());
     SuccessOrExit(error = mSocket.SendTo(aMessage, messageInfo));
 
-    if (mClientState == kStateActive)
-    {
-        mPingReqTime = TimerMilli::GetNow() + mConfig.GetKeepAlive() * 700;
-    }
-
 exit:
     if (error != OT_ERROR_NONE)
     {
@@ -1515,10 +1541,22 @@ otError MqttsnClient::PingGateway()
         goto exit;
     }
 
+    // There is already pingreq message waiting
+    if (!mConnectQueue.IsEmpty())
+    {
+        goto exit;
+    }
+
     // Serialize and send PINGREQ message
     SuccessOrExit(error = pingreqMessage.Serialize(buffer, MAX_PACKET_SIZE, &length));
     SuccessOrExit(error = NewMessage(&message, buffer, length));
     SuccessOrExit(error = SendMessage(*message));
+
+    SuccessOrExit(error = mPingreqQueue.EnqueueCopy(*message, message->GetLength(),
+        MessageMetadata<void*>(mConfig.GetAddress(), mConfig.GetPort(), 0, TimerMilli::GetNow(),
+            mConfig.GetRetransmissionTimeout() * 1000, mConfig.GetRetransmissionCount(), nullptr, nullptr)));
+
+    mPingReqTime = TimerMilli::GetNow() + mConfig.GetKeepAlive() * 700;
 
 exit:
     return error;
@@ -1529,7 +1567,6 @@ void MqttsnClient::OnDisconnected()
     mDisconnectRequested = false;
     mSleepRequested = false;
     mTimeoutRaised = false;
-    mGwTimeout = 0;
     mPingReqTime = 0;
 
     mSubscribeQueue.ForceTimeout();
@@ -1592,6 +1629,34 @@ void MqttsnClient::HandlePublishQos2PubrecTimeout(const MessageMetadata<void*> &
 {
     OT_UNUSED_VARIABLE(aMetadata);
     OT_UNUSED_VARIABLE(aContext);
+}
+
+void MqttsnClient::HandleConnectTimeout(const MessageMetadata<void*> &aMetadata, void* aContext)
+{
+    MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
+    OT_UNUSED_VARIABLE(aMetadata);
+    OT_UNUSED_VARIABLE(aContext);
+    client->mTimeoutRaised = true;
+    if (client->mConnectedCallback)
+    {
+        client->mConnectedCallback(kCodeTimeout, client->mConnectContext);
+    }
+}
+
+void MqttsnClient::HandleDisconnectTimeout(const MessageMetadata<void*> &aMetadata, void* aContext)
+{
+    MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
+    OT_UNUSED_VARIABLE(aMetadata);
+    OT_UNUSED_VARIABLE(aContext);
+    client->mTimeoutRaised = true;
+}
+
+void MqttsnClient::HandlePingreqTimeout(const MessageMetadata<void*> &aMetadata, void* aContext)
+{
+    MqttsnClient* client = static_cast<MqttsnClient*>(aContext);
+    OT_UNUSED_VARIABLE(aMetadata);
+    OT_UNUSED_VARIABLE(aContext);
+    client->mTimeoutRaised = true;
 }
 
 void MqttsnClient::HandleMessageRetransmission(const Message &aMessage, const Ip6::Address &aAddress, uint16_t aPort, void* aContext)
