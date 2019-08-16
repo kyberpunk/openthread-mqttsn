@@ -77,7 +77,6 @@ enum ApplicationState
 static ApplicationState sState = kStarted;
 static ot::Mqttsn::MqttsnClient* sClient = nullptr;
 static uint32_t sConnectionTimeoutTime = 0;
-static otNetifAddress sSlaacAddresses[OPENTHREAD_CONFIG_NUM_SLAAC_ADDRESSES];
 #if GATEWAY_SEARCH
 static ot::Ip6::Address sGatewayAddress;
 static uint32_t sSearchGwTimeoutTime = 0;
@@ -239,7 +238,7 @@ static void ProcessWorker(ot::Instance &aInstance)
     switch (sState)
     {
     case kThreadStarting:
-        role = aInstance.GetThreadNetif().GetMle().GetRole();
+        role = aInstance.Get<ot::Mle::MleRouter>().GetRole();
         if (role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_LEADER || role == OT_DEVICE_ROLE_ROUTER)
         {
             PRINTF("Thread started. Role: %d.\r\n", role);
@@ -249,7 +248,7 @@ static void ProcessWorker(ot::Instance &aInstance)
     case kMqttConnecting:
         if (sConnectionTimeoutTime != 0 && sConnectionTimeoutTime < ot::TimerMilli::GetNow())
         {
-            role = aInstance.GetThreadNetif().GetMle().GetRole();
+            role = aInstance.Get<ot::Mle::MleRouter>().GetRole();
             PRINTF("Connection timeout. Role: %d\r\n", role);
             sState = kThreadStarted;
         }
@@ -273,7 +272,7 @@ static void ProcessWorker(ot::Instance &aInstance)
     case kMqttSearchGw:
         if (sSearchGwTimeoutTime != 0 && sSearchGwTimeoutTime < ot::TimerMilli::GetNow())
         {
-            role = aInstance.GetThreadNetif().GetMle().GetRole();
+            role = aInstance.Get<ot::Mle::MleRouter>().GetRole();
             PRINTF("Connection timeout. Role: %d\r\n", role);
             sState = kThreadStarted;
         }
@@ -284,45 +283,34 @@ static void ProcessWorker(ot::Instance &aInstance)
     }
 }
 
-void HandleNetifStateChanged(otChangedFlags aFlags, void *aContext)
-{
-    ot::Instance &instance = *static_cast<ot::Instance *>(aContext);
-    VerifyOrExit((aFlags & OT_CHANGED_THREAD_NETDATA) != 0);
-
-    ot::Utils::Slaac::UpdateAddresses(&instance, sSlaacAddresses, sizeof(sSlaacAddresses), ot::Utils::Slaac::CreateRandomIid, nullptr);
-
-exit:
-    return;
-}
-
 int main(int aArgc, char *aArgv[])
 {
     otError error = OT_ERROR_NONE;
     uint16_t acquisitionId = 0;
 
-    memset(sSlaacAddresses, 0, sizeof(sSlaacAddresses));
     otSysInit(aArgc, aArgv);
     BOARD_InitDebugConsole();
 
     ot::Instance &instance = ot::Instance::InitSingle();
     ot::Mqttsn::MqttsnClient client = ot::Mqttsn::MqttsnClient(instance);
     sClient = &client;
-    instance.GetNotifier().RegisterCallback(HandleNetifStateChanged, &instance);
     sState = kInitialized;
 
     // Set default network settings
-    ot::ThreadNetif &netif = instance.GetThreadNetif();
-    SuccessOrExit(error = netif.GetMac().SetNetworkName(NETWORK_NAME));
-    SuccessOrExit(error = netif.GetMac().SetExtendedPanId({EXTPANID}));
-    SuccessOrExit(error = netif.GetMac().SetPanId(PANID));
-    SuccessOrExit(error = netif.GetMac().AcquireRadioChannel(&acquisitionId));
-    SuccessOrExit(error = netif.GetMac().SetRadioChannel(acquisitionId, DEFAULT_CHANNEL));
-    SuccessOrExit(error = netif.GetKeyManager().SetMasterKey({MASTER_KEY}));
-    netif.GetActiveDataset().Clear();
-    netif.GetPendingDataset().Clear();
+    ot::ThreadNetif &netif = instance.Get<ot::ThreadNetif>();
+    ot::Mac::Mac &mac = instance.Get<ot::Mac::Mac>();
+    SuccessOrExit(error = mac.SetNetworkName(NETWORK_NAME));
+    mac.SetExtendedPanId({EXTPANID});
+    mac.SetPanId(PANID);
+    SuccessOrExit(error = mac.AcquireRadioChannel(&acquisitionId));
+    SuccessOrExit(error = mac.SetRadioChannel(acquisitionId, DEFAULT_CHANNEL));
+    SuccessOrExit(error = instance.Get<ot::KeyManager>().SetMasterKey({MASTER_KEY}));
+    instance.Get<ot::MeshCoP::ActiveDataset>().Clear();
+    instance.Get<ot::MeshCoP::PendingDataset>().Clear();
 
-    SuccessOrExit(error = netif.Up());
-    SuccessOrExit(error = netif.GetMle().Start(true, false));
+    instance.Get<ot::Utils::Slaac>().Enable();
+    netif.Up();
+    SuccessOrExit(error = instance.Get<ot::Mle::MleRouter>().Start(false));
 
     SuccessOrExit(error = sClient->Start(CLIENT_PORT));
 #if GATEWAY_SEARCH
@@ -334,7 +322,7 @@ int main(int aArgc, char *aArgv[])
 
     while (true)
     {
-        instance.GetTaskletScheduler().ProcessQueuedTasklets();
+        instance.Get<ot::TaskletScheduler>().ProcessQueuedTasklets();
         otSysProcessDrivers(&instance);
         ProcessWorker(instance);
         SuccessOrExit(error = sClient->Process());

@@ -230,7 +230,7 @@ bool WaitingMessagesQueue<CallbackType>::IsEmpty()
 
 MqttsnClient::MqttsnClient(Instance& instance)
     : InstanceLocator(instance)
-    , mSocket(GetInstance().GetThreadNetif().GetIp6().GetUdp())
+    , mSocket(GetInstance().Get<Ip6::Udp>())
     , mConfig()
     , mMessageId(1)
     , mPingReqTime(0)
@@ -1514,7 +1514,7 @@ otError MqttsnClient::SendMessage(Message &aMessage, const Ip6::Address &aAddres
     messageInfo.SetHopLimit(aHopLimit);
     messageInfo.SetPeerAddr(aAddress);
     messageInfo.SetPeerPort(aPort);
-    messageInfo.SetInterfaceId(OT_NETIF_INTERFACE_ID_THREAD);
+    messageInfo.SetIsHostInterface(false);
 
     PRINTF("Sending message to %s[:%u]\r\n", messageInfo.GetPeerAddr().ToString().AsCString(), messageInfo.GetPeerPort());
     SuccessOrExit(error = mSocket.SendTo(aMessage, messageInfo));
