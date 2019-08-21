@@ -29,7 +29,7 @@
 #include <string.h>
 #include "mqttsn_client.hpp"
 #include "mqttsn_serializer.hpp"
-#include "fsl_debug_console.h"
+#include "common/logging.hpp"
 
 /**
  * @file
@@ -47,12 +47,15 @@
  *
  */
 #define MQTTSN_MIN_PACKET_LENGTH 2
+/**
+ * Logging region for MQTT-SN client
+ *
+ */
+#define MQTTSN_LOG_REGION OT_LOG_REGION_CORE
 
 namespace ot {
 
 namespace Mqttsn {
-// TODO: Implement retransmission and DUP behavior
-// TODO: Implement OT logging
 
 template <typename CallbackType>
 MessageMetadata<CallbackType>::MessageMetadata()
@@ -293,17 +296,8 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
     }
     message.Read(offset, length, data);
 
-    // Dump packet
-    PRINTF("UDP message received:\r\n");
-    for (int32_t i = 0; i < length; i++)
-    {
-        if (i > 0)
-        {
-            PRINTF(" ");
-        }
-        PRINTF("%02X", data[i]);
-    }
-    PRINTF("\r\n");
+    otLogDebgCore("UDP message received:");
+    otDumpDebgCore("received", data, length);
 
     // Determine message type
     MessageType messageType;
@@ -311,7 +305,7 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
     {
         return;
     }
-    PRINTF("Message type: %d\r\n", messageType);
+    otLogDebgCore("Message type: %d", messageType);
 
     // TODO: Refactor switch to use separate handle functions
     // Handle received message type
@@ -1516,7 +1510,7 @@ otError MqttsnClient::SendMessage(Message &aMessage, const Ip6::Address &aAddres
     messageInfo.SetPeerPort(aPort);
     messageInfo.SetIsHostInterface(false);
 
-    PRINTF("Sending message to %s[:%u]\r\n", messageInfo.GetPeerAddr().ToString().AsCString(), messageInfo.GetPeerPort());
+    otLogDebgCore("Sending message to %s[:%u]", messageInfo.GetPeerAddr().ToString().AsCString(), messageInfo.GetPeerPort());
     SuccessOrExit(error = mSocket.SendTo(aMessage, messageInfo));
 
 exit:
