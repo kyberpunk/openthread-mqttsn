@@ -1116,6 +1116,22 @@ protected:
     bool VerifyGatewayAddress(const Ip6::MessageInfo &aMessageInfo);
 
 private:
+    void ConnackReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void SubackReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void PublishReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void AdvertiseReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void GwinfoReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void RegackReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void RegisterReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void PubackReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void PubrecReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void PubrelReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void PubcompReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void UnsubackReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void PingreqReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void PingrespReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+    void DisconnectReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length);
+
     static void HandleUdpReceive(void *aContext, otMessage *aMessage, const otMessageInfo *aMessageInfo);
 
     static void HandleSubscribeTimeout(const MessageMetadata<SubscribeCallbackFunc> &aMetadata, void* aContext);

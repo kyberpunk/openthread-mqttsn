@@ -307,626 +307,655 @@ void MqttsnClient::HandleUdpReceive(void *aContext, otMessage *aMessage, const o
     }
     otLogDebgCore("Message type: %d", messageType);
 
-    // TODO: Refactor switch to use separate handle functions
     // Handle received message type
     switch (messageType)
     {
-    // CONACK message
     case kTypeConnack:
+        client->ConnackReceived(messageInfo, data, length);
+        break;
+    case kTypeSuback:
+        client->SubackReceived(messageInfo, data, length);
+        break;
+    case kTypePublish:
+        client->PublishReceived(messageInfo, data, length);
+        break;
+    case kTypeAdvertise:
+        client->AdvertiseReceived(messageInfo, data, length);
+        break;
+    case kTypeGwInfo:
+        client->GwinfoReceived(messageInfo, data, length);
+        break;
+    case kTypeRegack:
+        client->RegackReceived(messageInfo, data, length);
+        break;
+    case kTypeRegister:
+        client->RegisterReceived(messageInfo, data, length);
+        break;
+    case kTypePuback:
+        client->PubackReceived(messageInfo, data, length);
+        break;
+    case kTypePubrec:
+        client->PubrecReceived(messageInfo, data, length);
+        break;
+    case kTypePubrel:
+        client->PubrelReceived(messageInfo, data, length);
+        break;
+    case kTypePubcomp:
+        client->PubcompReceived(messageInfo, data, length);
+        break;
+    case kTypeUnsuback:
+        client->UnsubackReceived(messageInfo, data, length);
+        break;
+    case kTypePingreq:
+        client->PingreqReceived(messageInfo, data, length);
+        break;
+    case kTypePingresp:
+        client->PingrespReceived(messageInfo, data, length);
+        break;
+    case kTypeDisconnect:
+        client->DisconnectReceived(messageInfo, data, length);
+        break;
+    default:
+        break;
+    }
+}
+
+void MqttsnClient::ConnackReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    // Check source IPv6 address
+    if (!VerifyGatewayAddress(messageInfo))
     {
-        // Check source IPv6 address
-        if (!client->VerifyGatewayAddress(messageInfo))
-        {
-            break;
-        }
+        return;
+    }
 
-        ConnackMessage connackMessage;
-        if (connackMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
-        MessageMetadata<void*> metadata;
+    ConnackMessage connackMessage;
+    if (connackMessage.Deserialize(data, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    MessageMetadata<void*> metadata;
 
-        // Check if any waiting connect message queued
-        Message *connectMessage = client->mConnectQueue.Find(0, metadata);
-        if (connectMessage == nullptr)
-        {
-            break;
-        }
-        client->mConnectQueue.Dequeue(*connectMessage);
+    // Check if any waiting connect message queued
+    Message *connectMessage = mConnectQueue.Find(0, metadata);
+    if (connectMessage)
+    {
+        mConnectQueue.Dequeue(*connectMessage);
 
-        client->mClientState = kStateActive;
-        if (client->mConnectedCallback)
+        mClientState = kStateActive;
+        if (mConnectedCallback)
         {
-            client->mConnectedCallback(connackMessage.GetReturnCode(), client->mConnectContext);
+            mConnectedCallback(connackMessage.GetReturnCode(), mConnectContext);
         }
     }
-        break;
-    // SUBACK message
-    case kTypeSuback:
-    {
-        // Client must be in active state
-        if (client->mClientState != kStateActive)
-        {
-            break;
-        }
-        // Check source IPv6 address
-        if (!client->VerifyGatewayAddress(messageInfo))
-        {
-            break;
-        }
-        SubackMessage subackMessage;
-        if (subackMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
+}
 
-        // Find waiting message with corresponding ID
-        MessageMetadata<SubscribeCallbackFunc> metadata;
-        Message* subscribeMessage = client->mSubscribeQueue.Find(subackMessage.GetMessageId(), metadata);
-        if (!subscribeMessage)
-        {
-            break;
-        }
+void MqttsnClient::SubackReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    // Client must be in active state
+    if (mClientState != kStateActive)
+    {
+        return;
+    }
+    // Check source IPv6 address
+    if (!VerifyGatewayAddress(messageInfo))
+    {
+        return;
+    }
+    SubackMessage subackMessage;
+    if (subackMessage.Deserialize(data, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+
+    // Find waiting message with corresponding ID
+    MessageMetadata<SubscribeCallbackFunc> metadata;
+    Message* subscribeMessage = mSubscribeQueue.Find(subackMessage.GetMessageId(), metadata);
+    if (subscribeMessage)
+    {
         // Invoke callback and dequeue message
         if (metadata.mCallback)
         {
             metadata.mCallback(subackMessage.GetReturnCode(), subackMessage.GetTopicId(),
                 subackMessage.GetQos(), metadata.mContext);
         }
-        client->mSubscribeQueue.Dequeue(*subscribeMessage);
+        mSubscribeQueue.Dequeue(*subscribeMessage);
     }
-        break;
-    // PUBLISH message
-    case kTypePublish:
+}
+
+void MqttsnClient::PublishReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    // Client must be in active or awake state to receive published messages
+    if (mClientState != kStateActive && mClientState != kStateAwake)
     {
-        // Client must be in active or awake state to receive published messages
-        if (client->mClientState != kStateActive && client->mClientState != kStateAwake)
-        {
-            break;
-        }
-        // Check source IPv6 address
-        if (!client->VerifyGatewayAddress(messageInfo))
-        {
-            break;
-        }
-        PublishMessage publishMessage;
-        if (publishMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
-
-        // Filter duplicate QoS level 2 messages
-        if (publishMessage.GetQos() == kQos2)
-        {
-            MessageMetadata<void*> metadata;
-            Message* pubrecMessage = client->mPublishQos2PubrecQueue.Find(publishMessage.GetMessageId(), metadata);
-            if (pubrecMessage)
-            {
-                break;
-            }
-        }
-
-        ReturnCode code = kCodeRejectedTopicId;
-        if (client->mPublishReceivedCallback)
-        {
-            // Invoke callback
-            code = client->mPublishReceivedCallback(publishMessage.GetPayload(), publishMessage.GetPayloadLength(),
-                publishMessage.GetTopicIdType(), publishMessage.GetTopicId(), publishMessage.GetShortTopicName(),
-                client->mPublishReceivedContext);
-        }
-
-        // Handle QoS
-        if (publishMessage.GetQos() == kQos0 || publishMessage.GetQos() == kQosm1)
-        {
-            // On QoS level 0 or -1 do nothing
-            break;
-        }
-        else if (publishMessage.GetQos() == kQos1)
-        {
-            // On QoS level 1  send PUBACK response
-            int32_t packetLength = -1;
-            Message* responseMessage = nullptr;
-            unsigned char buffer[MAX_PACKET_SIZE];
-            PubackMessage pubackMessage(code, publishMessage.GetTopicId(), publishMessage.GetMessageId());
-            if (pubackMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
-            {
-                break;
-            }
-            if (client->NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
-                client->SendMessage(*responseMessage) != OT_ERROR_NONE)
-            {
-                break;
-            }
-        }
-        else if (publishMessage.GetQos() == kQos2)
-        {
-            // On QoS level 2 send PUBREC message and wait for PUBREL
-            int32_t packetLength = -1;
-            Message* responseMessage = nullptr;
-            unsigned char buffer[MAX_PACKET_SIZE];
-            PubrecMessage pubrecMessage(publishMessage.GetMessageId());
-            if (pubrecMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
-            {
-                break;
-            }
-            if (client->NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
-                client->SendMessage(*responseMessage) != OT_ERROR_NONE)
-            {
-                break;
-            }
-
-            // Add message to waiting queue, message with same messageId will not be processed until PUBREL message received
-            if (client->mPublishQos2PubrecQueue.EnqueueCopy(*responseMessage, responseMessage->GetLength(), MessageMetadata<void*>(
-                client->mConfig.GetAddress(), client->mConfig.GetPort(), publishMessage.GetMessageId(), TimerMilli::GetNow(),
-                client->mConfig.GetRetransmissionTimeout() * 1000, client->mConfig.GetRetransmissionCount(), NULL, NULL)) != OT_ERROR_NONE)
-            {
-                break;
-            }
-        }
+        return;
     }
-        break;
-    // ADVERTISE message
-    case kTypeAdvertise:
+    // Check source IPv6 address
+    if (VerifyGatewayAddress(messageInfo))
     {
-        AdvertiseMessage advertiseMessage;
-        if (advertiseMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
-        if (client->mAdvertiseCallback)
-        {
-            client->mAdvertiseCallback(messageInfo.GetPeerAddr(), advertiseMessage.GetGatewayId(),
-                advertiseMessage.GetDuration(), client->mAdvertiseContext);
-        }
+        return;
     }
-        break;
-    // GWINFO message
-    case kTypeGwInfo:
+    PublishMessage publishMessage;
+    if (publishMessage.Deserialize(data, length) != OT_ERROR_NONE)
     {
-        GwInfoMessage gwInfoMessage;
-        if (gwInfoMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
-        if (client->mSearchGwCallback)
-        {
-            Ip6::Address address = (gwInfoMessage.GetHasAddress()) ? gwInfoMessage.GetAddress()
-                : messageInfo.GetPeerAddr();
-            client->mSearchGwCallback(address, gwInfoMessage.GetGatewayId(), client->mSearchGwContext);
-        }
+        return;
     }
-        break;
-    // Regack message
-    case kTypeRegack:
+
+    // Filter duplicate QoS level 2 messages
+    if (publishMessage.GetQos() == kQos2)
     {
-        // Client state must be active
-        if (client->mClientState != kStateActive)
-        {
-            break;
-        }
-        // Check source IPv6 address
-        if (!client->VerifyGatewayAddress(messageInfo))
-        {
-            break;
-        }
-
-        RegackMessage regackMessage;
-        if (regackMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
-        // Find waiting message with corresponding ID
-        MessageMetadata<RegisterCallbackFunc> metadata;
-        Message* registerMessage = client->mRegisterQueue.Find(regackMessage.GetMessageId(), metadata);
-        if (!registerMessage)
-        {
-            break;
-        }
-        // Invoke callback and dequeue message
-        if (metadata.mCallback)
-        {
-            metadata.mCallback(regackMessage.GetReturnCode(), regackMessage.GetTopicId(), metadata.mContext);
-        }
-        client->mRegisterQueue.Dequeue(*registerMessage);
-    }
-        break;
-    // REGISTER message
-    case kTypeRegister:
-    {
-        int32_t packetLength = -1;
-        Message* responseMessage = nullptr;
-        unsigned char buffer[MAX_PACKET_SIZE];
-
-        // Client state must be active
-        if (client->mClientState != kStateActive)
-        {
-            break;
-        }
-        if (!client->VerifyGatewayAddress(messageInfo))
-        {
-            break;
-        }
-
-        RegisterMessage registerMessage;
-        if (registerMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
-
-        // Invoke register callback
-        ReturnCode code = kCodeRejectedTopicId;
-        if (client->mRegisterReceivedCallback)
-        {
-            code = client->mRegisterReceivedCallback(registerMessage.GetTopicId(), registerMessage.GetTopicName(), client->mRegisterReceivedContext);
-        }
-
-        // Send REGACK response message
-        RegackMessage regackMessage(code, registerMessage.GetTopicId(), registerMessage.GetMessageId());
-        if (regackMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
-        {
-            break;
-        }
-        if (client->NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
-            client->SendMessage(*responseMessage) != OT_ERROR_NONE)
-        {
-            break;
-        }
-    }
-    // PUBACK message
-    case kTypePuback:
-    {
-        // Client state must be active
-        if (client->mClientState != kStateActive)
-        {
-            break;
-        }
-        // Check source IPv6 address.
-        if (!client->VerifyGatewayAddress(messageInfo))
-        {
-            break;
-        }
-
-        PubackMessage pubackMessage;
-        if (pubackMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
-
-        // Process QoS level 1 message
-        // Find message waiting for acknowledge
-        MessageMetadata<PublishCallbackFunc> metadata;
-        Message* publishMessage = client->mPublishQos1Queue.Find(pubackMessage.GetMessageId(), metadata);
-        if (publishMessage)
-        {
-            // Invoke confirmation callback
-            if (metadata.mCallback)
-            {
-                metadata.mCallback(pubackMessage.GetReturnCode(), metadata.mContext);
-            }
-            // Dequeue waiting message
-            client->mPublishQos1Queue.Dequeue(*publishMessage);
-            break;
-        }
-        // May be QoS level 2 message error response
-        publishMessage = client->mPublishQos2PublishQueue.Find(pubackMessage.GetMessageId(), metadata);
-        if (publishMessage)
-        {
-            // Invoke confirmation callback
-            if (metadata.mCallback)
-            {
-                metadata.mCallback(pubackMessage.GetReturnCode(), metadata.mContext);
-            }
-            // Dequeue waiting message
-            client->mPublishQos2PublishQueue.Dequeue(*publishMessage);
-            break;
-        }
-
-        // May be QoS level 0 message error response - it is not handled
-    }
-        break;
-    // PUBREC message
-    case kTypePubrec:
-    {
-        int32_t packetLength = -1;
-        unsigned char buffer[MAX_PACKET_SIZE];
-
-        // Client state must be active
-        if (client->mClientState != kStateActive)
-        {
-            break;
-        }
-        // Check source IPv6 address
-        if (!client->VerifyGatewayAddress(messageInfo))
-        {
-            break;
-        }
-
-        PubrecMessage pubrecMessage;
-        if (pubrecMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
-        // Process QoS level 2 message
-        // Find message waiting for receive acknowledge
-        MessageMetadata<PublishCallbackFunc> metadata;
-        Message* publishMessage = client->mPublishQos2PublishQueue.Find(pubrecMessage.GetMessageId(), metadata);
-        if (!publishMessage)
-        {
-            break;
-        }
-
-        // Send PUBREL message
-        PubrelMessage pubrelMessage(metadata.mMessageId);
-        if (pubrelMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
-        {
-            break;
-        }
-        Message* responseMessage = nullptr;
-        if (client->NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
-            client->SendMessage(*responseMessage) != OT_ERROR_NONE)
-        {
-            break;
-        }
-        // Enqueue PUBREL message and wait for PUBCOMP
-        if (client->mPublishQos2PubrelQueue.EnqueueCopy(*responseMessage, responseMessage->GetLength(),
-            MessageMetadata<PublishCallbackFunc>(client->mConfig.GetAddress(), client->mConfig.GetPort(), metadata.mMessageId,
-                TimerMilli::GetNow(), client->mConfig.GetRetransmissionTimeout() * 1000, client->mConfig.GetRetransmissionCount(), metadata.mCallback, client)) != OT_ERROR_NONE)
-        {
-            break;
-        }
-
-        // Dequeue waiting PUBLISH message
-        client->mPublishQos2PublishQueue.Dequeue(*publishMessage);
-    }
-    // PUBREL message
-    case kTypePubrel:
-    {
-        int32_t packetLength = -1;
-        unsigned char buffer[MAX_PACKET_SIZE];
-
-        // Client state must be active
-        if (client->mClientState != kStateActive)
-        {
-            break;
-        }
-        // Check source IPv6 address
-        if (!client->VerifyGatewayAddress(messageInfo))
-        {
-            break;
-        }
-
-        PubrelMessage pubrelMessage;
-        if (pubrelMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
-        // Process QoS level 2 PUBREL message
-        // Find PUBREC message waiting for receive acknowledge
         MessageMetadata<void*> metadata;
-        Message* pubrecMessage = client->mPublishQos2PubrecQueue.Find(pubrelMessage.GetMessageId(), metadata);
-        if (!pubrecMessage)
+        Message* pubrecMessage = mPublishQos2PubrecQueue.Find(publishMessage.GetMessageId(), metadata);
+        if (pubrecMessage)
         {
-            break;
+            return;
         }
-        // Send PUBCOMP message
-        PubcompMessage pubcompMessage(metadata.mMessageId);
-        if (pubcompMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
-        {
-            break;
-        }
-        Message* responseMessage = nullptr;
-        if (client->NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
-            client->SendMessage(*responseMessage) != OT_ERROR_NONE)
-        {
-            break;
-        }
-
-        // Dequeue waiting message
-        client->mPublishQos2PubrecQueue.Dequeue(*pubrecMessage);
     }
-    // PUBCOMP message
-    case kTypePubcomp:
+
+    ReturnCode code = kCodeRejectedTopicId;
+    if (mPublishReceivedCallback)
     {
-        // Client state must be active
-        if (client->mClientState != kStateActive)
+        // Invoke callback
+        code = mPublishReceivedCallback(publishMessage.GetPayload(), publishMessage.GetPayloadLength(),
+            publishMessage.GetTopicIdType(), publishMessage.GetTopicId(), publishMessage.GetShortTopicName(),
+            mPublishReceivedContext);
+    }
+
+    // Handle QoS
+    if (publishMessage.GetQos() == kQos0 || publishMessage.GetQos() == kQosm1)
+    {
+        // On QoS level 0 or -1 do nothing
+    }
+    else if (publishMessage.GetQos() == kQos1)
+    {
+        // On QoS level 1  send PUBACK response
+        int32_t packetLength = -1;
+        Message* responseMessage = nullptr;
+        unsigned char buffer[MAX_PACKET_SIZE];
+        PubackMessage pubackMessage(code, publishMessage.GetTopicId(), publishMessage.GetMessageId());
+        if (pubackMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
         {
-            break;
+            return;
         }
-        // Check source IPv6 address
-        if (!client->VerifyGatewayAddress(messageInfo))
+        if (NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE
+            || SendMessage(*responseMessage) != OT_ERROR_NONE)
         {
-            break;
+            return;
+        }
+    }
+    else if (publishMessage.GetQos() == kQos2)
+    {
+        // On QoS level 2 send PUBREC message and wait for PUBREL
+        int32_t packetLength = -1;
+        Message* responseMessage = nullptr;
+        unsigned char buffer[MAX_PACKET_SIZE];
+        PubrecMessage pubrecMessage(publishMessage.GetMessageId());
+        if (pubrecMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
+        {
+            return;
+        }
+        if (NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
+            SendMessage(*responseMessage) != OT_ERROR_NONE)
+        {
+            return;
         }
 
-        PubcompMessage pubcompMessage;
-        if (pubcompMessage.Deserialize(data, length) != OT_ERROR_NONE)
+        const MessageMetadata<void*> &metadata = MessageMetadata<void*>(mConfig.GetAddress(), mConfig.GetPort(),
+            publishMessage.GetMessageId(), TimerMilli::GetNow(), mConfig.GetRetransmissionTimeout() * 1000,
+            mConfig.GetRetransmissionCount(), nullptr, nullptr);
+        // Add message to waiting queue, message with same messageId will not be processed until PUBREL message received
+        if (mPublishQos2PubrecQueue.EnqueueCopy(*responseMessage, responseMessage->GetLength(), metadata) != OT_ERROR_NONE)
         {
-            break;
+            return;
         }
-        // Process QoS level 2 PUBCOMP message
-        // Find PUBREL message waiting for receive acknowledge
-        MessageMetadata<PublishCallbackFunc> metadata;
-        Message* pubrelMessage = client->mPublishQos2PubrelQueue.Find(pubcompMessage.GetMessageId(), metadata);
-        if (!pubrelMessage)
-        {
-            break;
-        }
+    }
+}
+
+void MqttsnClient::AdvertiseReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    AdvertiseMessage advertiseMessage;
+    if (advertiseMessage.Deserialize(data, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    if (mAdvertiseCallback)
+    {
+        mAdvertiseCallback(messageInfo.GetPeerAddr(), advertiseMessage.GetGatewayId(),
+            advertiseMessage.GetDuration(), mAdvertiseContext);
+    }
+}
+
+void MqttsnClient::GwinfoReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    GwInfoMessage gwInfoMessage;
+    if (gwInfoMessage.Deserialize(data, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    if (mSearchGwCallback)
+    {
+        Ip6::Address address = (gwInfoMessage.GetHasAddress()) ? gwInfoMessage.GetAddress()
+            : messageInfo.GetPeerAddr();
+        mSearchGwCallback(address, gwInfoMessage.GetGatewayId(), mSearchGwContext);
+    }
+}
+
+void MqttsnClient::RegackReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    // Client state must be active
+    if (mClientState != kStateActive)
+    {
+        return;
+    }
+    // Check source IPv6 address
+    if (!VerifyGatewayAddress(messageInfo))
+    {
+        return;
+    }
+
+    RegackMessage regackMessage;
+    if (regackMessage.Deserialize(data, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    // Find waiting message with corresponding ID
+    MessageMetadata<RegisterCallbackFunc> metadata;
+    Message* registerMessage = mRegisterQueue.Find(regackMessage.GetMessageId(), metadata);
+    if (!registerMessage)
+    {
+        return;
+    }
+    // Invoke callback and dequeue message
+    if (metadata.mCallback)
+    {
+        metadata.mCallback(regackMessage.GetReturnCode(), regackMessage.GetTopicId(), metadata.mContext);
+    }
+    mRegisterQueue.Dequeue(*registerMessage);
+}
+
+void MqttsnClient::RegisterReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    int32_t packetLength = -1;
+    Message* responseMessage = nullptr;
+    unsigned char buffer[MAX_PACKET_SIZE];
+
+    // Client state must be active
+    if (mClientState != kStateActive)
+    {
+        return;
+    }
+    if (!VerifyGatewayAddress(messageInfo))
+    {
+        return;
+    }
+
+    RegisterMessage registerMessage;
+    if (registerMessage.Deserialize(data, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+
+    // Invoke register callback
+    ReturnCode code = kCodeRejectedTopicId;
+    if (mRegisterReceivedCallback)
+    {
+        code = mRegisterReceivedCallback(registerMessage.GetTopicId(), registerMessage.GetTopicName(), mRegisterReceivedContext);
+    }
+
+    // Send REGACK response message
+    RegackMessage regackMessage(code, registerMessage.GetTopicId(), registerMessage.GetMessageId());
+    if (regackMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    if (NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
+        SendMessage(*responseMessage) != OT_ERROR_NONE)
+    {
+        return;
+    }
+}
+
+void MqttsnClient::PubackReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    // Client state must be active
+    if (mClientState != kStateActive)
+    {
+        return;
+    }
+    // Check source IPv6 address.
+    if (!VerifyGatewayAddress(messageInfo))
+    {
+        return;
+    }
+    PubackMessage pubackMessage;
+    if (pubackMessage.Deserialize(data, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+
+    // Process QoS level 1 message
+    // Find message waiting for acknowledge
+    MessageMetadata<PublishCallbackFunc> metadata;
+    Message* publishMessage = mPublishQos1Queue.Find(pubackMessage.GetMessageId(), metadata);
+    if (publishMessage)
+    {
         // Invoke confirmation callback
         if (metadata.mCallback)
         {
-            metadata.mCallback(kCodeAccepted, metadata.mContext);
+            metadata.mCallback(pubackMessage.GetReturnCode(), metadata.mContext);
         }
         // Dequeue waiting message
-        client->mPublishQos2PubrelQueue.Dequeue(*pubrelMessage);
+        mPublishQos1Queue.Dequeue(*publishMessage);
+        return;
     }
-    // UNSUBACK message
-    case kTypeUnsuback:
+    // May be QoS level 2 message error response
+    publishMessage = mPublishQos2PublishQueue.Find(pubackMessage.GetMessageId(), metadata);
+    if (publishMessage)
     {
-        // Client state must be active
-        if (client->mClientState != kStateActive)
-        {
-            break;
-        }
-        // Check source IPv6 address
-        if (!client->VerifyGatewayAddress(messageInfo))
-        {
-            break;
-        }
-
-        UnsubackMessage unsubackMessage;
-        if (unsubackMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
-        // Find unsubscription message waiting for confirmation
-        MessageMetadata<UnsubscribeCallbackFunc> metadata;
-        Message* unsubscribeMessage = client->mUnsubscribeQueue.Find(unsubackMessage.GetMessageId(), metadata);
-        if (!unsubscribeMessage)
-        {
-            break;
-        }
-        // Invoke unsubscribe confirmation callback
+        // Invoke confirmation callback
         if (metadata.mCallback)
         {
-            metadata.mCallback(kCodeAccepted, metadata.mContext);
+            metadata.mCallback(pubackMessage.GetReturnCode(), metadata.mContext);
         }
         // Dequeue waiting message
-        client->mUnsubscribeQueue.Dequeue(*unsubscribeMessage);
+        mPublishQos2PublishQueue.Dequeue(*publishMessage);
+        return;
     }
-        break;
-    // PINGREQ message
-    case kTypePingreq:
+
+    // May be QoS level 0 message error response - it is not handled
+}
+
+void MqttsnClient::PubrecReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    int32_t packetLength = -1;
+    unsigned char buffer[MAX_PACKET_SIZE];
+
+    // Client state must be active
+    if (mClientState != kStateActive)
     {
-        Message* responseMessage = nullptr;
-        int32_t packetLength = -1;
-        unsigned char buffer[MAX_PACKET_SIZE];
-
-        // Client state must be active
-        if (client->mClientState != kStateActive)
-        {
-            break;
-        }
-
-        PingreqMessage pingreqMessage;
-        if (pingreqMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
-
-        // Send PINGRESP message
-        PingrespMessage pingrespMessage;
-        if (pingrespMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
-        {
-            break;
-        }
-        if (client->NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
-            client->SendMessage(*responseMessage, messageInfo.GetPeerAddr(), client->mConfig.GetPort()) != OT_ERROR_NONE)
-        {
-            break;
-        }
+        return;
     }
-        break;
-    // PINGRESP message
-    case kTypePingresp:
+    // Check source IPv6 address
+    if (!VerifyGatewayAddress(messageInfo))
     {
-        // Check source IPv6 address
-        if (!client->VerifyGatewayAddress(messageInfo))
-        {
-            break;
-        }
-        PingrespMessage pingrespMessage;
-        if (pingrespMessage.Deserialize(data, length) != OT_ERROR_NONE)
-        {
-            break;
-        }
-
-        // Check if any waiting connect message queued
-        MessageMetadata<void*> metadata;
-        Message *pingreqMessage = client->mPingreqQueue.Find(0, metadata);
-        if (pingreqMessage == nullptr)
-        {
-            break;
-        }
-        client->mPingreqQueue.Dequeue(*pingreqMessage);
-
-        // If the client is awake PINRESP message put it into sleep again
-        if (client->mClientState == kStateAwake)
-        {
-            client->mClientState = kStateAsleep;
-            if (client->mDisconnectedCallback)
-            {
-                client->mDisconnectedCallback(kAsleep, client->mDisconnectedContext);
-            }
-        }
+        return;
     }
-        break;
-    // DISCONNECT message
-    case kTypeDisconnect:
+    PubrecMessage pubrecMessage;
+    if (pubrecMessage.Deserialize(data, length) != OT_ERROR_NONE)
     {
+        return;
+    }
 
-        DisconnectMessage disconnectMessage;
-        if (disconnectMessage.Deserialize(data, length))
+    // Process QoS level 2 message
+    // Find message waiting for receive acknowledge
+    MessageMetadata<PublishCallbackFunc> metadata;
+    Message* publishMessage = mPublishQos2PublishQueue.Find(pubrecMessage.GetMessageId(), metadata);
+    if (!publishMessage)
+    {
+        return;
+    }
+
+    // Send PUBREL message
+    PubrelMessage pubrelMessage(metadata.mMessageId);
+    if (pubrelMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    Message* responseMessage = nullptr;
+    if (NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
+        SendMessage(*responseMessage) != OT_ERROR_NONE)
+    {
+        return;
+    }
+
+    // Enqueue PUBREL message and wait for PUBCOMP
+    const MessageMetadata<PublishCallbackFunc> &pubrelMetadata = MessageMetadata<PublishCallbackFunc>(mConfig.GetAddress(),
+        mConfig.GetPort(), metadata.mMessageId, TimerMilli::GetNow(), mConfig.GetRetransmissionTimeout() * 1000,
+        mConfig.GetRetransmissionCount(), metadata.mCallback, this);
+    if (mPublishQos2PubrelQueue.EnqueueCopy(*responseMessage, responseMessage->GetLength(), pubrelMetadata) != OT_ERROR_NONE)
+    {
+        return;
+    }
+
+    // Dequeue waiting PUBLISH message
+    mPublishQos2PublishQueue.Dequeue(*publishMessage);
+}
+
+void MqttsnClient::PubrelReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    int32_t packetLength = -1;
+    unsigned char buffer[MAX_PACKET_SIZE];
+
+    // Client state must be active
+    if (mClientState != kStateActive)
+    {
+        return;
+    }
+    // Check source IPv6 address
+    if (!VerifyGatewayAddress(messageInfo))
+    {
+        return;
+    }
+    PubrelMessage pubrelMessage;
+    if (pubrelMessage.Deserialize(data, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+
+    // Process QoS level 2 PUBREL message
+    // Find PUBREC message waiting for receive acknowledge
+    MessageMetadata<void*> metadata;
+    Message* pubrecMessage = mPublishQos2PubrecQueue.Find(pubrelMessage.GetMessageId(), metadata);
+    if (!pubrecMessage)
+    {
+        return;
+    }
+    // Send PUBCOMP message
+    PubcompMessage pubcompMessage(metadata.mMessageId);
+    if (pubcompMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    Message* responseMessage = nullptr;
+    if (NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
+        SendMessage(*responseMessage) != OT_ERROR_NONE)
+    {
+        return;
+    }
+
+    // Dequeue waiting message
+    mPublishQos2PubrecQueue.Dequeue(*pubrecMessage);
+}
+
+void MqttsnClient::PubcompReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    // Client state must be active
+    if (mClientState != kStateActive)
+    {
+        return;
+    }
+    // Check source IPv6 address
+    if (!VerifyGatewayAddress(messageInfo))
+    {
+        return;
+    }
+    PubcompMessage pubcompMessage;
+    if (pubcompMessage.Deserialize(data, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+
+    // Process QoS level 2 PUBCOMP message
+    // Find PUBREL message waiting for receive acknowledge
+    MessageMetadata<PublishCallbackFunc> metadata;
+    Message* pubrelMessage = mPublishQos2PubrelQueue.Find(pubcompMessage.GetMessageId(), metadata);
+    if (!pubrelMessage)
+    {
+        return;
+    }
+    // Invoke confirmation callback
+    if (metadata.mCallback)
+    {
+        metadata.mCallback(kCodeAccepted, metadata.mContext);
+    }
+    // Dequeue waiting message
+    mPublishQos2PubrelQueue.Dequeue(*pubrelMessage);
+}
+
+void MqttsnClient::UnsubackReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    // Client state must be active
+    if (mClientState != kStateActive)
+    {
+        return;
+    }
+    // Check source IPv6 address
+    if (!VerifyGatewayAddress(messageInfo))
+    {
+        return;
+    }
+
+    UnsubackMessage unsubackMessage;
+    if (unsubackMessage.Deserialize(data, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    // Find unsubscription message waiting for confirmation
+    MessageMetadata<UnsubscribeCallbackFunc> metadata;
+    Message* unsubscribeMessage = mUnsubscribeQueue.Find(unsubackMessage.GetMessageId(), metadata);
+    if (!unsubscribeMessage)
+    {
+        return;
+    }
+    // Invoke unsubscribe confirmation callback
+    if (metadata.mCallback)
+    {
+        metadata.mCallback(kCodeAccepted, metadata.mContext);
+    }
+    // Dequeue waiting message
+    mUnsubscribeQueue.Dequeue(*unsubscribeMessage);
+}
+
+void MqttsnClient::PingreqReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    Message* responseMessage = nullptr;
+    int32_t packetLength = -1;
+    unsigned char buffer[MAX_PACKET_SIZE];
+
+    // Client state must be active
+    if (mClientState != kStateActive)
+    {
+        return;
+    }
+
+    PingreqMessage pingreqMessage;
+    if (pingreqMessage.Deserialize(data, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+
+    // Send PINGRESP message
+    PingrespMessage pingrespMessage;
+    if (pingrespMessage.Serialize(buffer, MAX_PACKET_SIZE, &packetLength) != OT_ERROR_NONE)
+    {
+        return;
+    }
+    if (NewMessage(&responseMessage, buffer, packetLength) != OT_ERROR_NONE ||
+        SendMessage(*responseMessage, messageInfo.GetPeerAddr(), mConfig.GetPort()) != OT_ERROR_NONE)
+    {
+        return;
+    }
+}
+
+void MqttsnClient::PingrespReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    // Check source IPv6 address
+    if (!VerifyGatewayAddress(messageInfo))
+    {
+        return;
+    }
+    PingrespMessage pingrespMessage;
+    if (pingrespMessage.Deserialize(data, length) != OT_ERROR_NONE)
+    {
+        return;
+    }
+
+    // Check if any waiting connect message queued
+    MessageMetadata<void*> metadata;
+    Message *pingreqMessage = mPingreqQueue.Find(0, metadata);
+    if (pingreqMessage == nullptr)
+    {
+        return;
+    }
+    mPingreqQueue.Dequeue(*pingreqMessage);
+
+    // If the client is awake PINRESP message put it into sleep again
+    if (mClientState == kStateAwake)
+    {
+        mClientState = kStateAsleep;
+        if (mDisconnectedCallback)
         {
-            break;
-        }
-
-        // Check source IPv6 address
-        if (!client->VerifyGatewayAddress(messageInfo))
-        {
-            break;
-        }
-
-        // Check if the waiting disconnect message is queued
-        MessageMetadata<void*> metadata;
-        Message *waitingMessage = client->mDisconnectQueue.Find(0, metadata);
-        if (waitingMessage == nullptr)
-        {
-            break;
-        }
-        client->mDisconnectQueue.Dequeue(*waitingMessage);
-
-        DisconnectType reason = kServer;
-
-        // Handle disconnection behavior depending on client state
-        switch (client->mClientState)
-        {
-        case kStateActive:
-        case kStateAwake:
-        case kStateAsleep:
-            if (client->mDisconnectRequested)
-            {
-                // Regular disconnect
-                client->mClientState = kStateDisconnected;
-                reason = kServer;
-            }
-            else if (client->mSleepRequested)
-            {
-                // Sleep state was requested - go asleep
-                client->mClientState = kStateAsleep;
-                reason = kAsleep;
-            }
-            else
-            {
-                // Disconnected by gateway
-                client->mClientState = kStateDisconnected;
-                reason = kServer;
-            }
-            break;
-        default:
-            break;
-        }
-        client->OnDisconnected();
-
-        // Invoke disconnected callback
-        if (client->mDisconnectedCallback)
-        {
-            client->mDisconnectedCallback(reason, client->mDisconnectedContext);
+            mDisconnectedCallback(kAsleep, mDisconnectedContext);
         }
     }
+}
+
+void MqttsnClient::DisconnectReceived(const Ip6::MessageInfo &messageInfo, const unsigned char* data, uint16_t length)
+{
+    DisconnectMessage disconnectMessage;
+    if (disconnectMessage.Deserialize(data, length))
+    {
+        return;
+    }
+
+    // Check source IPv6 address
+    if (!VerifyGatewayAddress(messageInfo))
+    {
+        return;
+    }
+
+    // Check if the waiting disconnect message is queued
+    MessageMetadata<void*> metadata;
+    Message *waitingMessage = mDisconnectQueue.Find(0, metadata);
+    if (waitingMessage != nullptr)
+    {
+        mDisconnectQueue.Dequeue(*waitingMessage);
+    }
+
+    // Handle disconnection behavior depending on client state
+    DisconnectType reason = kServer;
+    switch (mClientState)
+    {
+    case kStateActive:
+    case kStateAwake:
+    case kStateAsleep:
+        if (mDisconnectRequested)
+        {
+            // Regular disconnect
+            mClientState = kStateDisconnected;
+            reason = kServer;
+        }
+        else if (mSleepRequested)
+        {
+            // Sleep state was requested - go asleep
+            mClientState = kStateAsleep;
+            reason = kAsleep;
+        }
+        else
+        {
+            // Disconnected by gateway
+            mClientState = kStateDisconnected;
+            reason = kServer;
+        }
         break;
     default:
         break;
+    }
+    OnDisconnected();
+
+    // Invoke disconnected callback
+    if (mDisconnectedCallback)
+    {
+        mDisconnectedCallback(reason, mDisconnectedContext);
     }
 }
 
