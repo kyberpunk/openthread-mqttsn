@@ -35,11 +35,6 @@
 #include "openthread-system.h"
 #include "utils/slaac_address.hpp"
 
-#include "board.h"
-#include "fsl_debug_console.h"
-
-// TODO: Implement log output with OT platform implementation
-
 #include "mqttsn_client.hpp"
 
 #define NETWORK_NAME "OTBR4444"
@@ -61,6 +56,9 @@
 
 #define CLIENT_ID "THREAD"
 #define CLIENT_PORT 10000
+
+#define LOG_REGION OT_LOG_REGION_CLI
+#define MAX_LOG_LINE_LENGTH 255
 
 enum ApplicationState
 {
@@ -88,12 +86,12 @@ static void MqttsnConnectedCallback(ot::Mqttsn::ReturnCode aCode, void* aContext
 
     if (aCode == ot::Mqttsn::kCodeAccepted)
     {
-        PRINTF("Successfully connected.\r\n");
+        otLogInfoCli("Successfully connected.");
         sState = kMqttConnected;
     }
     else
     {
-        PRINTF("Connection failed with code: %d.\r\n", aCode);
+        otLogInfoCli("Connection failed with code: %d.", aCode);
         sState = kThreadStarted;
     }
 }
@@ -102,7 +100,7 @@ static void MqttsnDisconnectedCallback(ot::Mqttsn::DisconnectType aType, void* a
 {
     OT_UNUSED_VARIABLE(aContext);
 
-    PRINTF("Client disconnected. Reason: %d.\r\n", aType);
+    otLogInfoCli("Client disconnected. Reason: %d.", aType);
     sState = kThreadStarted;
 }
 
@@ -112,18 +110,18 @@ static ot::Mqttsn::ReturnCode MqttsnReceived(const uint8_t* aPayload, int32_t aP
 
     if (aTopicIdType == ot::Mqttsn::kTopicId)
     {
-        PRINTF("Message received from topic %d.\r\n", aTopicId);
+        otLogInfoCli("Message received from topic %d.", aTopicId);
     }
     else if (aTopicIdType == ot::Mqttsn::kShortTopicName)
     {
-        PRINTF("Message received from topic %s.\r\n", aShortTopicName);
+        otLogInfoCli("Message received from topic %s.", aShortTopicName);
     }
 
     for (int i = 0; i < aPayloadLength; i++)
     {
-        PRINTF("%c", static_cast<int8_t>(aPayload[i]));
+        otLogInfoCli("%c", static_cast<int8_t>(aPayload[i]));
     }
-    PRINTF("\r\n");
+    otLogInfoCli("");
     return ot::Mqttsn::kCodeAccepted;
 }
 
@@ -142,11 +140,11 @@ static void MqttsnConnect(const ot::Ip6::Address &aAddress, uint16_t aPort)
     otError error = OT_ERROR_NONE;
     if ((error = sClient->Connect(config)) == OT_ERROR_NONE)
     {
-        PRINTF("Connecting to MQTTSN broker.\r\n");
+        otLogInfoCli("Connecting to MQTTSN broker.");
     }
     else
     {
-        PRINTF("Connection failed with error: %d.\r\n", error);
+        otLogInfoCli("Connection failed with error: %d.", error);
     }
 }
 
@@ -156,11 +154,11 @@ static void MqttsnPublished(ot::Mqttsn::ReturnCode aCode, void* aContext)
 
     if (aCode == ot::Mqttsn::kCodeAccepted)
     {
-        PRINTF("Successfully published %d.\r\n");
+        otLogInfoCli("Successfully published %d.");
     }
     else
     {
-        PRINTF("Publish failed with code: %d.\r\n", aCode);
+        otLogInfoCli("Publish failed with code: %d.", aCode);
     }
 }
 
@@ -170,7 +168,7 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::To
 
     if (aCode == ot::Mqttsn::kCodeAccepted)
     {
-        PRINTF("Successfully subscribed to topic: %d with QoS level %d.\r\n", aTopicId, aQos);
+        otLogInfoCli("Successfully subscribed to topic: %d with QoS level %d.", aTopicId, aQos);
         sState = kMqttRunning;
 
         // Test Qos 1 message
@@ -178,19 +176,19 @@ static void MqttsnSubscribeCallback(ot::Mqttsn::ReturnCode aCode, ot::Mqttsn::To
         otError error = sClient->Publish(reinterpret_cast<unsigned char*>(text), sizeof(text), ot::Mqttsn::kQos1, aTopicId, MqttsnPublished, nullptr);
         if (error != OT_ERROR_NONE)
         {
-            PRINTF("Publish failed with error: %d.\r\n", error);
+            otLogInfoCli("Publish failed with error: %d.", error);
         }
     }
     else
     {
-        PRINTF("Subscription failed with code: %d.\r\n", aCode);
+        otLogInfoCli("Subscription failed with code: %d.", aCode);
     }
 }
 
 static void MqttsnSubscribe()
 {
     sClient->Subscribe(DEFAULT_TOPIC, false, ot::Mqttsn::Qos::kQos1, MqttsnSubscribeCallback, nullptr);
-    PRINTF("Subscribing to topic: %s\r\n", DEFAULT_TOPIC);
+    otLogInfoCli("Subscribing to topic: %s", DEFAULT_TOPIC);
 }
 
 #if GATEWAY_SEARCH
@@ -198,7 +196,7 @@ static void SearchGatewayCallback(const ot::Ip6::Address &aAddress, uint8_t aGat
 {
     OT_UNUSED_VARIABLE(aContext);
 
-    PRINTF("SearchGw found gateway with id: %u, %s\r\n", aGatewayId, aAddress.ToString().AsCString());
+    otLogInfoCli("SearchGw found gateway with id: %u, %s", aGatewayId, aAddress.ToString().AsCString());
     sGatewayAddress = aAddress;
     MqttsnConnect(sGatewayAddress, GATEWAY_MULTICAST_PORT);
     sState = kMqttConnecting;
@@ -208,7 +206,7 @@ static void AdvertiseCallback(const ot::Ip6::Address &aAddress, uint8_t aGateway
 {
     OT_UNUSED_VARIABLE(aContext);
 
-    PRINTF("Received gateway advertise with id: %u, %s\r\n", aGatewayId, aAddress.ToString().AsCString());
+    otLogInfoCli("Received gateway advertise with id: %u, %s", aGatewayId, aAddress.ToString().AsCString());
     sGatewayAddress = aAddress;
     MqttsnConnect(sGatewayAddress, GATEWAY_MULTICAST_PORT);
     sState = kMqttConnecting;
@@ -222,11 +220,11 @@ static void SearchGateway(const char* aMulticastAddress, uint16_t aPort)
     if ((error = sClient->SearchGateway(address, aPort, GATEWAY_MULTICAST_RADIUS)) == OT_ERROR_NONE)
     {
         sSearchGwTimeoutTime = ot::TimerMilli::GetNow() + SEND_TIMEOUT;
-        PRINTF("Searching gateway.\r\n");
+        otLogInfoCli("Searching gateway.");
     }
     else
     {
-        PRINTF("Search gateway failed with error: %d.\r\n", error);
+        otLogInfoCli("Search gateway failed with error: %d.", error);
     }
     sState = kMqttSearchGw;
 }
@@ -241,7 +239,7 @@ static void ProcessWorker(ot::Instance &aInstance)
         role = aInstance.Get<ot::Mle::MleRouter>().GetRole();
         if (role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_LEADER || role == OT_DEVICE_ROLE_ROUTER)
         {
-            PRINTF("Thread started. Role: %d.\r\n", role);
+            otLogInfoCli("Thread started. Role: %d.", role);
             sState = kThreadStarted;
         }
         break;
@@ -249,7 +247,7 @@ static void ProcessWorker(ot::Instance &aInstance)
         if (sConnectionTimeoutTime != 0 && sConnectionTimeoutTime < ot::TimerMilli::GetNow())
         {
             role = aInstance.Get<ot::Mle::MleRouter>().GetRole();
-            PRINTF("Connection timeout. Role: %d\r\n", role);
+            otLogInfoCli("Connection timeout. Role: %d", role);
             sState = kThreadStarted;
         }
         break;
@@ -273,7 +271,7 @@ static void ProcessWorker(ot::Instance &aInstance)
         if (sSearchGwTimeoutTime != 0 && sSearchGwTimeoutTime < ot::TimerMilli::GetNow())
         {
             role = aInstance.Get<ot::Mle::MleRouter>().GetRole();
-            PRINTF("Connection timeout. Role: %d\r\n", role);
+            otLogInfoCli("Connection timeout. Role: %d", role);
             sState = kThreadStarted;
         }
         break;
@@ -289,7 +287,7 @@ int main(int aArgc, char *aArgv[])
     uint16_t acquisitionId = 0;
 
     otSysInit(aArgc, aArgv);
-    BOARD_InitDebugConsole();
+    otPlatUartEnable();
 
     ot::Instance &instance = ot::Instance::InitSingle();
     ot::Mqttsn::MqttsnClient client = ot::Mqttsn::MqttsnClient(instance);
@@ -318,7 +316,7 @@ int main(int aArgc, char *aArgv[])
     SuccessOrExit(error = sClient->SetAdvertiseCallback(AdvertiseCallback, NULL));
 #endif
     sState = kThreadStarting;
-    PRINTF("Thread starting.\r\n");
+    otLogInfoCli("Thread starting.");
 
     while (true)
     {
@@ -330,7 +328,7 @@ int main(int aArgc, char *aArgv[])
     return 0;
 
 exit:
-    PRINTF("Initialization failed with error: %d\r\n", error);
+    otLogInfoCli("Initialization failed with error: %d", error);
     return 1;
 }
 
@@ -338,10 +336,15 @@ extern "C" void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const ch
 {
     OT_UNUSED_VARIABLE(aLogLevel);
     OT_UNUSED_VARIABLE(aLogRegion);
+    char buf[MAX_LOG_LINE_LENGTH];
 
     va_list ap;
     va_start(ap, aFormat);
-    VPRINTF(aFormat, ap);
+    int32_t bufLength = vsnprintf(buf, sizeof(buf), aFormat, ap);
+    if (bufLength >= 0)
+    {
+        otPlatUartSend(reinterpret_cast<uint8_t*>(buf), bufLength);
+    }
     va_end(ap);
 }
 
