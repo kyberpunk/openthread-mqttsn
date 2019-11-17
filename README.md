@@ -1,5 +1,5 @@
 # Thread MQTT-SN Client Library
-**Sources were merged directly into [openthread fork](https://github.com/kyberpunk/openthread/blob/master/README.md) for better integration.
+**Sources were merged directly into [openthread fork](https://github.com/kyberpunk/openthread/blob/master/README.md) for better integration.**
 
 This repository contains MQTT-SN client implementation based on OpenThread SDK. Protocol communicates over UDP in Thread mesh network. For further knowledge about MQTT-SN protocol and gateway concept you should read [the MQTT-SN specification](http://mqtt.org/new/wp-content/uploads/2009/06/MQTT-SN_spec_v1.2.pdf).
 
