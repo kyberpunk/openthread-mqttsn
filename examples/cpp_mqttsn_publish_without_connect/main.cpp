@@ -62,7 +62,7 @@ static void Publish()
 {
     // Publish data with QoS level -1
     // No connection establishment is needed
-    // Shord topic name is used since it is not possible to register without connection
+    // Short topic name is used since it is not possible to register without connection
     ot::Ip6::Address address;
     address.FromString(GATEWAY_ADDRESS);
     const char* data = "{\"temperature\":24.0}";
@@ -77,9 +77,8 @@ static void StateChanged(otChangedFlags aFlags, void *aContext)
     if (aFlags & OT_CHANGED_THREAD_ROLE)
     {
         otDeviceRole role = instance.Get<ot::Mle::MleRouter>().GetRole();
-        // If role changed to any of active roles and MQTT-SN client is not connected then connect
-        if ((role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_LEADER || role == OT_DEVICE_ROLE_ROUTER)
-            && sClient->GetState() == kStateDisconnected)
+        // If role changed to any of active roles then publish
+        if (role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_LEADER || role == OT_DEVICE_ROLE_ROUTER)
         {
             Publish();
         }

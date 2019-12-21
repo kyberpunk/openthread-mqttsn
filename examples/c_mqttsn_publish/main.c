@@ -90,7 +90,7 @@ static void HandleConnected(otMqttsnReturnCode aCode, void* aContext)
 
 static void MqttsnConnect(otInstance *instance)
 {
-    struct otIp6Address address;
+    otIp6Address address;
     otIp6AddressFromString(GATEWAY_ADDRESS, &address);
 
     // Set MQTT-SN client configuration settings

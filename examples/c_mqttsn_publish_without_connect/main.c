@@ -51,42 +51,21 @@
 #define CLIENT_ID "THREAD"
 #define CLIENT_PORT 10000
 
+#define TOPIC_NAME "se"
+
 static const uint8_t sExpanId[] = EXTPANID;
 static const uint8_t sMasterKey[] = MASTER_KEY;
 
-static void HandleConnected(otMqttsnReturnCode aCode, void* aContext)
+static void Publish(otInstance *instance)
 {
-    OT_UNUSED_VARIABLE(aCode);
-    OT_UNUSED_VARIABLE(aContext);
-    // Handle connected
-}
-
-static void HandleDisconnected(otMqttsnDisconnectType aType, void* aContext)
-{
-    OT_UNUSED_VARIABLE(aType);
-    OT_UNUSED_VARIABLE(aContext);
-    // Handle disconnect
-}
-
-static void MqttsnConnect(otInstance *instance)
-{
+    // Publish data with QoS level -1
+    // No connection establishment is needed
+    // Short topic name is used since it is not possible to register without connection
     otIp6Address address;
     otIp6AddressFromString(GATEWAY_ADDRESS, &address);
-
-    // Set MQTT-SN client configuration settings
-    otMqttsnConfig config;
-    config.mClientId = CLIENT_ID;
-    config.mKeepAlive = 30;
-    config.mCleanSession = true;
-    config.mPort = GATEWAY_PORT;
-    config.mAddress = &address;
-
-    // Register connected callback
-    otMqttsnSetConnectedHandler(instance, HandleConnected, (void *)instance);
-    // Register disconnected callback
-    otMqttsnSetDisconnectedHandler(instance, HandleDisconnected, (void *)instance);
-    // Connect to the MQTT broker (gateway)
-    otMqttsnConnect(instance, &config);
+    const char* data = "{\"temperature\":24.0}";
+    int32_t length = strlen(data);
+    otMqttsnPublishQosm1Short(instance, (const uint8_t*)data, length, TOPIC_NAME, &address, GATEWAY_PORT);
 }
 
 static void StateChanged(otChangedFlags aFlags, void *aContext)
@@ -96,11 +75,10 @@ static void StateChanged(otChangedFlags aFlags, void *aContext)
     if (aFlags & OT_CHANGED_THREAD_ROLE)
     {
         otDeviceRole role = otThreadGetDeviceRole(instance);
-        // If role changed to any of active roles and MQTT-SN client is not connected then connect
-        if ((role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_ROUTER)
-            && otMqttsnGetState(instance) == kStateDisconnected)
+        // If role changed to any of active roles then publish
+        if (role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_ROUTER)
         {
-            MqttsnConnect(instance);
+            Publish(instance);
         }
     }
 }
