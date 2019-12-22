@@ -88,7 +88,7 @@ static void SearchGateway(otInstance *instance)
     otIp6Address address;
     otIp6AddressFromString(GATEWAY_MULTICAST_ADDRESS, &address);
 
-    otMqttsnSetSearchgwHandler(instance, HandleSearchGw, NULL);
+    otMqttsnSetSearchgwHandler(instance, HandleSearchGw, (void *)instance);
     // Send SEARCHGW multicast message
     otMqttsnSearchGateway(instance, &address, GATEWAY_MULTICAST_PORT, GATEWAY_MULTICAST_RADIUS);
 }
