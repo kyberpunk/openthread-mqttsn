@@ -26,16 +26,18 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
-#include "common/instance.hpp"
 #include "openthread/instance.h"
+#include "openthread/thread.h"
+#include "openthread/tasklet.h"
+#include "openthread/ip6.h"
 #include "openthread/mqttsn.h"
+#include "openthread/dataset.h"
+#include "openthread/link.h"
 #include "openthread-system.h"
-#include "utils/slaac_address.hpp"
-
-#include "mqttsn/mqttsn_client.hpp"
 
 #define NETWORK_NAME "OTBR4444"
 #define PANID 0x4444
@@ -50,14 +52,10 @@
 #define CLIENT_ID "THREAD"
 #define CLIENT_PORT 10000
 
-using namespace ot::Mqttsn;
-
-static MqttsnClient* sClient = NULL;
-
 static const uint8_t sExpanId[] = EXTPANID;
 static const uint8_t sMasterKey[] = MASTER_KEY;
 
-static void HandleConnected(ReturnCode aCode, void* aContext)
+static void HandleConnected(otMqttsnReturnCode aCode, void* aContext)
 {
     OT_UNUSED_VARIABLE(aCode);
     OT_UNUSED_VARIABLE(aContext);
@@ -66,40 +64,46 @@ static void HandleConnected(ReturnCode aCode, void* aContext)
 
 static void HandleSearchGw(const otIp6Address* aAddress, uint8_t aGatewayId, void* aContext)
 {
+    OT_UNUSED_VARIABLE(aGatewayId);
     // Handle SEARCHGW response received
     // Connect to received address
-    MqttsnConfig config;
-    config.SetClientId(CLIENT_ID);
-    config.SetKeepAlive(30);
-    config.SetCleanSession(true);
-    config.SetPort(GATEWAY_MULTICAST_PORT);
-    config.SetAddress(*static_cast<const ot::Ip6::Address *>(aAddress));
-    sClient->SetConnectedCallback(HandleConnected, NULL);
-    sClient->Connect(config);
+    otInstance *instance = (otInstance *)aContext;
+    otIp6Address address = *aAddress;
+    // Set MQTT-SN client configuration settings
+    otMqttsnConfig config;
+    config.mClientId = CLIENT_ID;
+    config.mKeepAlive = 30;
+    config.mCleanSession = true;
+    config.mPort = GATEWAY_MULTICAST_PORT;
+    config.mAddress = &address;
+
+    // Register connected callback
+    otMqttsnSetConnectedHandler(instance, HandleConnected, (void *)instance);
+    // Connect to the MQTT broker (gateway)
+    otMqttsnConnect(instance, &config);
 }
 
-static void SearchGateway()
+static void SearchGateway(otInstance *instance)
 {
-    ot::Ip6::Address address;
-    address.FromString(GATEWAY_MULTICAST_ADDRESS);
+    otIp6Address address;
+    otIp6AddressFromString(GATEWAY_MULTICAST_ADDRESS, &address);
 
-    sClient->SetSearchGwCallback(HandleSearchGw, NULL);
+    otMqttsnSetSearchgwHandler(instance, HandleSearchGw, NULL);
     // Send SEARCHGW multicast message
-    sClient->SearchGateway(address, GATEWAY_MULTICAST_PORT, GATEWAY_MULTICAST_RADIUS);
+    otMqttsnSearchGateway(instance, &address, GATEWAY_MULTICAST_PORT, GATEWAY_MULTICAST_RADIUS);
 }
 
 static void StateChanged(otChangedFlags aFlags, void *aContext)
 {
-    ot::Instance &instance = *reinterpret_cast<ot::Instance*>(aContext);
+    otInstance *instance = (otInstance *)aContext;
     // when thread role changed
     if (aFlags & OT_CHANGED_THREAD_ROLE)
     {
-        otDeviceRole role = instance.Get<ot::Mle::MleRouter>().GetRole();
+        otDeviceRole role = otThreadGetDeviceRole(instance);
         // If role changed to any of active roles then send SEARCHGW message
-        if ((role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_LEADER || role == OT_DEVICE_ROLE_ROUTER)
-            && sClient->GetState() == kStateDisconnected)
+        if (role == OT_DEVICE_ROLE_CHILD || role == OT_DEVICE_ROLE_ROUTER)
         {
-            SearchGateway();
+            SearchGateway(instance);
         }
     }
 }
@@ -107,54 +111,47 @@ static void StateChanged(otChangedFlags aFlags, void *aContext)
 int main(int aArgc, char *aArgv[])
 {
     otError error = OT_ERROR_NONE;
-    ot::Mac::ExtendedPanId extendedPanid;
-    ot::MasterKey masterKey;
+    otExtendedPanId extendedPanid;
+    otMasterKey masterKey;
+    otInstance *instance;
 
     otSysInit(aArgc, aArgv);
-    ot::Instance &instance = ot::Instance::InitSingle();
-    sClient = &instance.Get<MqttsnClient>();
-    ot::ThreadNetif &netif = instance.Get<ot::ThreadNetif>();
-    ot::Mac::Mac &mac = instance.Get<ot::Mac::Mac>();
+    instance = otInstanceInitSingle();
 
     // Set default network settings
     // Set network name
-    SuccessOrExit(error = mac.SetNetworkName(NETWORK_NAME));
+    error = otThreadSetNetworkName(instance, NETWORK_NAME);
     // Set extended PANID
     memcpy(extendedPanid.m8, sExpanId, sizeof(sExpanId));
-    mac.SetExtendedPanId(extendedPanid);
+    error = otThreadSetExtendedPanId(instance, &extendedPanid);
     // Set PANID
-    mac.SetPanId(PANID);
+    error = otLinkSetPanId(instance, PANID);
     // Set channel
-    SuccessOrExit(error = mac.SetPanChannel(DEFAULT_CHANNEL));
+    error = otLinkSetChannel(instance, DEFAULT_CHANNEL);
     // Set masterkey
     memcpy(masterKey.m8, sMasterKey, sizeof(sMasterKey));
-    SuccessOrExit(error = instance.Get<ot::KeyManager>().SetMasterKey(masterKey));
+    error = otThreadSetMasterKey(instance, &masterKey);
 
-    instance.Get<ot::MeshCoP::ActiveDataset>().Clear();
-    instance.Get<ot::MeshCoP::PendingDataset>().Clear();
     // Register notifier callback to receive thread role changed events
-    instance.Get<ot::Notifier>().RegisterCallback(StateChanged, &instance);
+    error = otSetStateChangedCallback(instance, StateChanged, instance);
 
     // Start thread network
-    instance.Get<ot::Utils::Slaac>().Enable();
-    netif.Up();
-    SuccessOrExit(error = instance.Get<ot::Mle::MleRouter>().Start(false));
+    otIp6SetSlaacEnabled(instance, true);
+    error = otIp6SetEnabled(instance, true);
+    error = otThreadSetEnabled(instance, true);
 
     // Start MQTT-SN client
-    SuccessOrExit(error = sClient->Start(CLIENT_PORT));
+    error = otMqttsnStart(instance, CLIENT_PORT);
 
     while (true)
     {
-        instance.Get<ot::TaskletScheduler>().ProcessQueuedTasklets();
-        otSysProcessDrivers(&instance);
+        otTaskletsProcess(instance);
+        otSysProcessDrivers(instance);
     }
-    return 0;
-
-exit:
-    return 1;
+    return error;
 }
 
-extern "C" void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
+void otPlatLog(otLogLevel aLogLevel, otLogRegion aLogRegion, const char *aFormat, ...)
 {
     OT_UNUSED_VARIABLE(aLogLevel);
     OT_UNUSED_VARIABLE(aLogRegion);
