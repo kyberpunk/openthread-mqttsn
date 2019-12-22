@@ -31,7 +31,6 @@
 
 #include "common/instance.hpp"
 #include "openthread/instance.h"
-#include "openthread/mqttsn.h"
 #include "openthread-system.h"
 #include "utils/slaac_address.hpp"
 
@@ -75,12 +74,12 @@ static void HandleRegistered(otMqttsnReturnCode aCode, otMqttsnTopicId aTopicId,
         // Publish message to the registered topic
         const char* data = "{\"temperature\":24.0}";
         int32_t length = strlen(data);
-        sClient->Publish(reinterpret_cast<const uint8_t*>(data), length, kQos1, aTopicId,
+        sClient->Publish(reinterpret_cast<const uint8_t *>(data), length, kQos1, aTopicId,
             HandlePublished, NULL);
     }
 }
 
-static void HandleConnected(ReturnCode aCode, void* aContext)
+static void HandleConnected(otMqttsnReturnCode aCode, void* aContext)
 {
     OT_UNUSED_VARIABLE(aContext);
     // Handle connected

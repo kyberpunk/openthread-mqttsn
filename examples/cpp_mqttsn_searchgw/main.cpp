@@ -31,7 +31,6 @@
 
 #include "common/instance.hpp"
 #include "openthread/instance.h"
-#include "openthread/mqttsn.h"
 #include "openthread-system.h"
 #include "utils/slaac_address.hpp"
 
@@ -66,6 +65,8 @@ static void HandleConnected(ReturnCode aCode, void* aContext)
 
 static void HandleSearchGw(const otIp6Address* aAddress, uint8_t aGatewayId, void* aContext)
 {
+    OT_UNUSED_VARIABLE(aContext);
+    OT_UNUSED_VARIABLE(aGatewayId);
     // Handle SEARCHGW response received
     // Connect to received address
     MqttsnConfig config;

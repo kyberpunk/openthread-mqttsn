@@ -30,7 +30,6 @@
 
 #include "common/instance.hpp"
 #include "openthread/instance.h"
-#include "openthread/mqttsn.h"
 #include "openthread-system.h"
 #include "utils/slaac_address.hpp"
 
@@ -55,14 +54,14 @@ static MqttsnClient* sClient = NULL;
 static const uint8_t sExpanId[] = EXTPANID;
 static const uint8_t sMasterKey[] = MASTER_KEY;
 
-static void HandleConnected(ReturnCode aCode, void* aContext)
+static void HandleConnected(otMqttsnReturnCode aCode, void* aContext)
 {
     OT_UNUSED_VARIABLE(aCode);
     OT_UNUSED_VARIABLE(aContext);
     // Handle connected
 }
 
-static void HandleDisconnected(DisconnectType aType, void* aContext)
+static void HandleDisconnected(otMqttsnDisconnectType aType, void* aContext)
 {
     OT_UNUSED_VARIABLE(aType);
     OT_UNUSED_VARIABLE(aContext);

@@ -31,7 +31,6 @@
 
 #include "common/instance.hpp"
 #include "openthread/instance.h"
-#include "openthread/mqttsn.h"
 #include "openthread-system.h"
 #include "utils/slaac_address.hpp"
 
