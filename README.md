@@ -29,4 +29,16 @@ Replace `<mqtt-broker>` with MQTT broker IPv4 address or hostname. Gateway conta
 
 ## C API Examples
 
+* [Connect to MQTT-SN gateway](examples/c_mqttsn_connect)
+* [Subscribe to the topic](examples/c_mqttsn_subscribe)
+* [Publish a message](examples/c_mqttsn_publish)
+* [Publish without need of connection](examples/c_mqttsn_publish_without_connect)
+* [Search for gateway with broadcast](examples/c_mqttsn_searchgw)
+
 ## C++ Examples
+
+* [Connect to MQTT-SN gateway](examples/cpp_mqttsn_connect)
+* [Subscribe to the topic](examples/cpp_mqttsn_subscribe)
+* [Publish a message](examples/cpp_mqttsn_publish)
+* [Publish without need of connection](examples/cpp_mqttsn_publish_without_connect)
+* [Search for gateway with broadcast](examples/cpp_mqttsn_searchgw)
