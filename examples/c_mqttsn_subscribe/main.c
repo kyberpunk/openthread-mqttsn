@@ -103,6 +103,8 @@ static void MqttsnConnect(otInstance *instance)
     config.mCleanSession = true;
     config.mPort = GATEWAY_PORT;
     config.mAddress = &address;
+    config.mRetransmissionCount = 3;
+    config.mRetransmissionTimeout = 10;
 
     // Register connected callback
     otMqttsnSetConnectedHandler(instance, HandleConnected, (void *)instance);

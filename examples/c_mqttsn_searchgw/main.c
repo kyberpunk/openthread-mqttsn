@@ -76,6 +76,8 @@ static void HandleSearchGw(const otIp6Address* aAddress, uint8_t aGatewayId, voi
     config.mCleanSession = true;
     config.mPort = GATEWAY_MULTICAST_PORT;
     config.mAddress = &address;
+    config.mRetransmissionCount = 3;
+    config.mRetransmissionTimeout = 10;
 
     // Register connected callback
     otMqttsnSetConnectedHandler(instance, HandleConnected, (void *)instance);
