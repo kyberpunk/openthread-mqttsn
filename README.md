@@ -34,6 +34,7 @@ Replace `<mqtt-broker>` with MQTT broker IPv4 address or hostname. Gateway conta
 * [Publish a message](examples/c_mqttsn_publish)
 * [Publish without need of connection](examples/c_mqttsn_publish_without_connect)
 * [Search for gateway with broadcast](examples/c_mqttsn_searchgw)
+* [MQTT-SN sleep mode](examples/c_mqttsn_sleep)
 
 ## C++ Examples
 
@@ -42,3 +43,4 @@ Replace `<mqtt-broker>` with MQTT broker IPv4 address or hostname. Gateway conta
 * [Publish a message](examples/cpp_mqttsn_publish)
 * [Publish without need of connection](examples/cpp_mqttsn_publish_without_connect)
 * [Search for gateway with broadcast](examples/cpp_mqttsn_searchgw)
+* [MQTT-SN sleep mode](examples/cpp_mqttsn_sleep)
