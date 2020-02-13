@@ -65,13 +65,11 @@ static const uint8_t sMasterKey[] = MASTER_KEY;
 
 static uint32_t sNextAwakeAt = 0xffffffff;
 
-static otMqttsnReturnCode HandlePublishReceived(const uint8_t* aPayload, int32_t aPayloadLength, otMqttsnTopicIdType aTopicIdType, otMqttsnTopicId aTopicId, const char* aShortTopicName, void* aContext)
+static otMqttsnReturnCode HandlePublishReceived(const uint8_t* aPayload, int32_t aPayloadLength, const otMqttsnTopic* aTopic, void* aContext)
 {
     OT_UNUSED_VARIABLE(aPayload);
     OT_UNUSED_VARIABLE(aPayloadLength);
-    OT_UNUSED_VARIABLE(aTopicIdType);
-    OT_UNUSED_VARIABLE(aTopicId);
-    OT_UNUSED_VARIABLE(aShortTopicName);
+    OT_UNUSED_VARIABLE(aTopic);
     OT_UNUSED_VARIABLE(aContext);
     // Handle received message from subscribed topic
 
@@ -91,10 +89,10 @@ static void HandleDisconnected(otMqttsnDisconnectType aType, void* aContext)
     }
 }
 
-static void HandleSubscribed(otMqttsnReturnCode aCode, otMqttsnTopicId aTopicId, otMqttsnQos aQos, void* aContext)
+static void HandleSubscribed(otMqttsnReturnCode aCode, const otMqttsnTopic* aTopic, otMqttsnQos aQos, void* aContext)
 {
     OT_UNUSED_VARIABLE(aCode);
-    OT_UNUSED_VARIABLE(aTopicId);
+    OT_UNUSED_VARIABLE(aTopic);
     OT_UNUSED_VARIABLE(aQos);
     OT_UNUSED_VARIABLE(aContext);
     // Handle subscribed event
@@ -116,7 +114,8 @@ static void HandleConnected(ReturnCode aCode, void* aContext)
         // Register disconnected callback
         sClient->SetDisconnectedCallback(HandleDisconnected, NULL);
         // Obtain target topic ID
-        sClient->Subscribe(TOPIC_NAME, false, kQos1, HandleSubscribed, NULL);
+        Topic topic = Topic::FromTopicName(TOPIC_NAME);
+        sClient->Subscribe(topic, kQos1, HandleSubscribed, NULL);
     }
 }
 

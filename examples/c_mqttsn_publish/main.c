@@ -63,7 +63,7 @@ static void HandlePublished(otMqttsnReturnCode aCode, void* aContext)
     // Handle published
 }
 
-static void HandleRegistered(otMqttsnReturnCode aCode, otMqttsnTopicId aTopicId, void* aContext)
+static void HandleRegistered(otMqttsnReturnCode aCode, const otMqttsnTopic* aTopic, void* aContext)
 {
     // Handle registered
     otInstance *instance = (otInstance *)aContext;
@@ -72,7 +72,7 @@ static void HandleRegistered(otMqttsnReturnCode aCode, otMqttsnTopicId aTopicId,
         // Publish message to the registered topic
         const char* data = "{\"temperature\":24.0}";
         int32_t length = strlen(data);
-        otMqttsnPublish(instance, (const uint8_t*)data, length, kQos1, aTopicId,
+        otMqttsnPublish(instance, (const uint8_t*)data, length, kQos1, false, aTopic,
             HandlePublished, NULL);
     }
 }

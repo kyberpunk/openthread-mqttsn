@@ -56,23 +56,21 @@
 static const uint8_t sExpanId[] = EXTPANID;
 static const uint8_t sMasterKey[] = MASTER_KEY;
 
-static otMqttsnReturnCode HandlePublishReceived(const uint8_t* aPayload, int32_t aPayloadLength, otMqttsnTopicIdType aTopicIdType, otMqttsnTopicId aTopicId, const char* aShortTopicName, void* aContext)
+static otMqttsnReturnCode HandlePublishReceived(const uint8_t* aPayload, int32_t aPayloadLength, const otMqttsnTopic* aTopic, void* aContext)
 {
     OT_UNUSED_VARIABLE(aPayload);
     OT_UNUSED_VARIABLE(aPayloadLength);
-    OT_UNUSED_VARIABLE(aTopicIdType);
-    OT_UNUSED_VARIABLE(aTopicId);
-    OT_UNUSED_VARIABLE(aShortTopicName);
+    OT_UNUSED_VARIABLE(aTopic);
     OT_UNUSED_VARIABLE(aContext);
     // Handle received message from subscribed topic
 
     return kCodeAccepted;
 }
 
-static void HandleSubscribed(otMqttsnReturnCode aCode, otMqttsnTopicId aTopicId, otMqttsnQos aQos, void* aContext)
+static void HandleSubscribed(otMqttsnReturnCode aCode, const otMqttsnTopic* aTopic, otMqttsnQos aQos, void* aContext)
 {
     OT_UNUSED_VARIABLE(aCode);
-    OT_UNUSED_VARIABLE(aTopicId);
+    OT_UNUSED_VARIABLE(aTopic);
     OT_UNUSED_VARIABLE(aQos);
     OT_UNUSED_VARIABLE(aContext);
     // Handle subscribed event
@@ -87,7 +85,8 @@ static void HandleConnected(otMqttsnReturnCode aCode, void* aContext)
         // Set callback for received messages
         otMqttsnSetPublishReceivedHandler(instance, HandlePublishReceived, NULL);
         // Obtain target topic ID
-        otMqttsnSubscribe(instance, TOPIC_NAME, kQos1, HandleSubscribed, NULL);
+        otMqttsnTopic topic = otMqttsnCreateTopicName(TOPIC_NAME);
+        otMqttsnSubscribe(instance, &topic, kQos1, HandleSubscribed, NULL);
     }
 }
 

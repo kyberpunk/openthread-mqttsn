@@ -38,6 +38,7 @@
 #include "openthread/dataset.h"
 #include "openthread/link.h"
 #include "openthread/platform/alarm-milli.h"
+#include "openthread-system.h"
 
 #define NETWORK_NAME "OTBR4444"
 #define PANID 0x4444
@@ -63,13 +64,11 @@ static const uint8_t sMasterKey[] = MASTER_KEY;
 
 static uint32_t sNextAwakeAt = 0xffffffff;
 
-static otMqttsnReturnCode HandlePublishReceived(const uint8_t* aPayload, int32_t aPayloadLength, otMqttsnTopicIdType aTopicIdType, otMqttsnTopicId aTopicId, const char* aShortTopicName, void* aContext)
+static otMqttsnReturnCode HandlePublishReceived(const uint8_t* aPayload, int32_t aPayloadLength, const otMqttsnTopic* aTopic, void* aContext)
 {
     OT_UNUSED_VARIABLE(aPayload);
     OT_UNUSED_VARIABLE(aPayloadLength);
-    OT_UNUSED_VARIABLE(aTopicIdType);
-    OT_UNUSED_VARIABLE(aTopicId);
-    OT_UNUSED_VARIABLE(aShortTopicName);
+    OT_UNUSED_VARIABLE(aTopic);
     OT_UNUSED_VARIABLE(aContext);
     // Handle received message from subscribed topic when awaken from sleep
 
@@ -89,10 +88,10 @@ static void HandleDisconnected(otMqttsnDisconnectType aType, void* aContext)
     }
 }
 
-static void HandleSubscribed(otMqttsnReturnCode aCode, otMqttsnTopicId aTopicId, otMqttsnQos aQos, void* aContext)
+static void HandleSubscribed(otMqttsnReturnCode aCode, const otMqttsnTopic* aTopic, otMqttsnQos aQos, void* aContext)
 {
     OT_UNUSED_VARIABLE(aCode);
-    OT_UNUSED_VARIABLE(aTopicId);
+    OT_UNUSED_VARIABLE(aTopic);
     OT_UNUSED_VARIABLE(aQos);
     // Handle subscribed event
 
@@ -111,7 +110,8 @@ static void HandleConnected(otMqttsnReturnCode aCode, void* aContext)
         // Set callback for received messages
         otMqttsnSetPublishReceivedHandler(instance, HandlePublishReceived, instance);
         // Obtain target topic ID
-        otMqttsnSubscribe(instance, TOPIC_NAME, kQos1, HandleSubscribed, instance);
+        otMqttsnTopic topic = otMqttsnCreateTopicName(TOPIC_NAME);
+        otMqttsnSubscribe(instance, &topic, kQos1, HandleSubscribed, instance);
     }
 }
 

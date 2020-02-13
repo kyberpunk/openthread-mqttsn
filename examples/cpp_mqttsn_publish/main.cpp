@@ -64,7 +64,7 @@ static void HandlePublished(otMqttsnReturnCode aCode, void* aContext)
     // Handle published
 }
 
-static void HandleRegistered(otMqttsnReturnCode aCode, otMqttsnTopicId aTopicId, void* aContext)
+static void HandleRegistered(otMqttsnReturnCode aCode, const otMqttsnTopic* aTopic, void* aContext)
 {
     OT_UNUSED_VARIABLE(aContext);
     // Handle registered
@@ -74,8 +74,8 @@ static void HandleRegistered(otMqttsnReturnCode aCode, otMqttsnTopicId aTopicId,
         // Publish message to the registered topic
         const char* data = "{\"temperature\":24.0}";
         int32_t length = strlen(data);
-        sClient->Publish(reinterpret_cast<const uint8_t *>(data), length, kQos1, aTopicId,
-            HandlePublished, NULL);
+        sClient->Publish(reinterpret_cast<const uint8_t *>(data), length, kQos1, false,
+            *static_cast<const Topic *>(aTopic), HandlePublished, NULL);
     }
 }
 

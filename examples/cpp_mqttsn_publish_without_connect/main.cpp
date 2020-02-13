@@ -67,7 +67,8 @@ static void Publish()
     address.FromString(GATEWAY_ADDRESS);
     const char* data = "{\"temperature\":24.0}";
     int32_t length = strlen(data);
-    sClient->PublishQosm1(reinterpret_cast<const uint8_t*>(data), length, TOPIC_NAME, address, GATEWAY_PORT);
+    Topic topic = Topic::FromShortTopicName(TOPIC_NAME);
+    sClient->PublishQosm1(reinterpret_cast<const uint8_t*>(data), length, false, topic, address, GATEWAY_PORT);
 }
 
 static void StateChanged(otChangedFlags aFlags, void *aContext)

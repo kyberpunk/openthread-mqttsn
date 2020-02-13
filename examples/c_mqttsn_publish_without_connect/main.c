@@ -65,7 +65,8 @@ static void Publish(otInstance *instance)
     otIp6AddressFromString(GATEWAY_ADDRESS, &address);
     const char* data = "{\"temperature\":24.0}";
     int32_t length = strlen(data);
-    otMqttsnPublishQosm1Short(instance, (const uint8_t*)data, length, TOPIC_NAME, &address, GATEWAY_PORT);
+    otMqttsnTopic topic = otMqttsnCreateTopicName(TOPIC_NAME);
+    otMqttsnPublishQosm1(instance, (const uint8_t*)data, length, false, &topic, &address, GATEWAY_PORT);
 }
 
 static void StateChanged(otChangedFlags aFlags, void *aContext)
