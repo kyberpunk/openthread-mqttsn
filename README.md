@@ -12,7 +12,7 @@ Run OpenThread border router container. No custom network is needed in this case
 ```
 sudo docker run -d --name otbr --sysctl "net.ipv6.conf.all.disable_ipv6=0 \
         net.ipv4.conf.all.forwarding=1 net.ipv6.conf.all.forwarding=1" -p 80:8080 \
-        --dns=127.0.0.1 -v /dev/ttyACM0:/dev/ttyACM0 --privileged \
+        --dns=127.0.0.1 -v --radio-url spinel+hdlc+uart:///dev/ttyACM0 --privileged \
         openthread/otbr --ncp-path /dev/ttyACM0
 ```
 
